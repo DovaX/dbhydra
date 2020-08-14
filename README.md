@@ -1,5 +1,5 @@
 # dbhydra
-Data science friendly ORM combining Python, Pandas and various SQL dialects
+Data science friendly ORM combining Python, Pandas, and various SQL dialects
 
 Aims: Easy integration with Pandas, SQL SERVER/MySQL database, and exports/imports to/from excel/CSV format
 
