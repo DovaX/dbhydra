@@ -1,0 +1,6 @@
+README.md
+setup.py
+dbhydra.egg-info/PKG-INFO
+dbhydra.egg-info/SOURCES.txt
+dbhydra.egg-info/dependency_links.txt
+dbhydra.egg-info/top_level.txt

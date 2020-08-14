@@ -1,0 +1,25 @@
+Metadata-Version: 2.1
+Name: dbhydra
+Version: 0.1.0
+Summary: Data science friendly ORM combining Python, Pandas, and various SQL dialects 
+Home-page: https://github.com/DovaX/dbhydra
+Author: DovaX
+Author-email: dovax.ai@gmail.com
+License: UNKNOWN
+Description: # dbhydra
+        Data science friendly ORM combining Python, Pandas and various SQL dialects
+        
+        Aims: Easy integration with Pandas, SQL SERVER/MySQL database, and exports/imports to/from excel/CSV format
+        
+        Done: Table functions (Create, Drop, Select, Update, Insert, and Delete) should be working fine
+        
+        Todo: Group by, Order by, Where, Linking of FK, Customizable PK,...
+        
+        Usage: Fill connection details in config.ini file, then follow the structure in hydra_model.py
+        
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
