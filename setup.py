@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="dbhydra",
-    version="0.1.0",
+    version="0.1.4",
     author="DovaX",
     author_email="dovax.ai@gmail.com",
     description="Data science friendly ORM combining Python, Pandas, and various SQL dialects ",
@@ -18,5 +18,10 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    install_requires=[
+          'pyodbc',
+          'pandas',
+          'pymysql',
+      ],
     python_requires='>=3.6',
 )

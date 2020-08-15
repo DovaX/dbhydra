@@ -1,13 +1,13 @@
 Metadata-Version: 2.1
 Name: dbhydra
-Version: 0.1.0
+Version: 0.1.4
 Summary: Data science friendly ORM combining Python, Pandas, and various SQL dialects 
 Home-page: https://github.com/DovaX/dbhydra
 Author: DovaX
 Author-email: dovax.ai@gmail.com
 License: UNKNOWN
 Description: # dbhydra
-        Data science friendly ORM combining Python, Pandas and various SQL dialects
+        Data science friendly ORM combining Python, Pandas, and various SQL dialects
         
         Aims: Easy integration with Pandas, SQL SERVER/MySQL database, and exports/imports to/from excel/CSV format
         
