@@ -104,9 +104,8 @@ class Mysqldb(AbstractDB):
         self.cursor.execute(query)
         self.connection.commit() 
     
-#Tables
-        
-class Selectable: #Tables and results of joins
+#Tables 
+class AbstractSelectable:
     def __init__(self,db1,name,columns=None):  
         self.db1=db1
         self.name=name
@@ -145,9 +144,25 @@ class Selectable: #Tables and results of joins
         rows=self.select_all()
         table_columns=self.columns
         demands_df=pd.DataFrame(rows,columns=table_columns)
-        return(demands_df)
+        return(demands_df)    
     
-class Joinable(Selectable):
+    def export_to_xlsx(self):
+        list1=self.select_all()
+        df1=pd.DataFrame(list1,columns=["id"]+self.columns)
+        df1.to_excel("items.xlsx")
+        
+class Selectable(AbstractSelectable): #Tables, views, and results of joins
+    pass
+
+class MysqlSelectable(AbstractSelectable):      
+    def select(self,query):
+        """TODO"""
+        print(query)
+        self.db1.execute(query)
+        rows = self.db1.cursor.fetchall()
+        return(rows)
+    
+class AbstractJoinable(AbstractSelectable):
     def __init__(self,db1,name,columns=None):
         super().__init__(db1,name,columns)
     
@@ -156,11 +171,42 @@ class Joinable(Selectable):
         join_columns=list(set(self.columns) | set(joinable.columns))
         new_joinable=Joinable(self.db1,join_name,join_columns)
         return(new_joinable)
-    
+ 
+class Joinable(Selectable):
+    pass
 
-
-class Table(Joinable):
+class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
+        super().__init__(db1,name,columns)
+        self.types=types
+
+    def drop(self):
+        query="DROP TABLE "+self.name
+        print(query)
+        self.db1.execute(query)
+        
+    def update(self,variable_assign,where=None):
+        if where is None:
+            query = "UPDATE "+self.name+" SET "+variable_assign
+        else:
+            query = "UPDATE "+self.name+" SET "+variable_assign+" WHERE "+where
+        print(query)
+        self.db1.execute(query)    
+
+    def insert_from_df(self,df,batch=1,try_mode=False):
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
+        
+        #handling nan values -> change to NULL TODO
+        for column in list(df.columns):
+            df.loc[pd.isna(df[column]), column] = "NULL"
+        
+        rows=df.values.tolist()
+        self.insert(rows,batch=batch,try_mode=try_mode)
+
+
+class Table(Joinable,AbstractTable):
+    def __init__(self,db1,name,columns=None,types=None):
+        """Override joinable init"""
         super().__init__(db1,name,columns)
         self.types=types
         
@@ -200,11 +246,6 @@ class Table(Joinable):
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
         
-    def drop(self):
-        query="DROP TABLE "+self.name
-        print(query)
-        self.db1.execute(query)
-
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
         
         assert len(self.columns)==len(self.types)
@@ -262,55 +303,11 @@ class Table(Joinable):
         print(query)
         self.db1.execute(query)
                 
-    def update(self,variable_assign,where=None):
-        if where is None:
-            query = "UPDATE "+self.name+" SET "+variable_assign
-        else:
-            query = "UPDATE "+self.name+" SET "+variable_assign+" WHERE "+where
-        print(query)
-        self.db1.execute(query)    
-    
-    def insert_from_df(self,df,batch=1,try_mode=False):
-        assert len(df.columns)+1==len(self.columns) #+1 because of id column
-        
-        #handling nan values -> change to NULL TODO
-        for column in list(df.columns):
-            df.loc[pd.isna(df[column]), column] = "NULL"
-        
-        rows=df.values.tolist()
-        self.insert(rows,batch=batch,try_mode=try_mode)
-    
-    def export_to_xlsx(self):
-        list1=self.select_all()
-        df1=pd.DataFrame(list1,columns=["id"]+self.columns)
-        df1.to_excel("items.xlsx")
-                   
-#dataframe - dictionary auxiliary functions     
-def df_to_dict(df,column1,column2):
-    dictionary=df.set_index(column1).to_dict()[column2]
-    return(dictionary)
-
-def dict_to_df(dictionary,column1,column2):
-    df=pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
-    return(df)
-    
-  
-class MysqlTable():
+       
+class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
-        self.db1=db1
-        self.name=name
-        self.columns=columns
+        super().__init__(db1,name,columns)
         self.types=types
-        
-    def select(self,query):
-        print(query)
-        self.db1.execute(query)
-        rows = self.db1.cursor.fetchall()
-        return(rows)
-    
-    def select_all(self):
-        list1=self.select("SELECT * FROM "+self.name)
-        return(list1)
         
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
@@ -328,21 +325,7 @@ class MysqlTable():
         except Exception as e:
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
-            
-            
-    def update(self,variable_assign,where=None):
-        if where is None:
-            query = "UPDATE "+self.name+" SET "+variable_assign
-        else:
-            query = "UPDATE "+self.name+" SET "+variable_assign+" WHERE "+where
-        print(query)
-        self.db1.execute(query)  
-            
-    def drop(self):
-        query="DROP TABLE "+self.name
-        print(query)
-        self.db1.execute(query)
-    
+                            
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
         
         assert len(self.columns)==len(self.types)
@@ -387,17 +370,6 @@ class MysqlTable():
                         print("Query",query,"Could not be inserted:",e)
                         file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
                         file.close()
-                
-    def insert_from_df(self,df,batch=1,try_mode=False):
-        assert len(df.columns)+1==len(self.columns) #+1 because of id column
-        
-        #handling nan values -> change to NULL TODO
-        for column in list(df.columns):
-            df.loc[pd.isna(df[column]), column] = "NULL"
-        
-        rows=df.values.tolist()
-        self.insert(rows,batch=batch,try_mode=try_mode)
-
 
     def add_foreign_key(self,foreign_key):
         parent_id=foreign_key['parent_id']
@@ -408,3 +380,53 @@ class MysqlTable():
         query="ALTER TABLE "+self.name+" ADD FOREIGN KEY ("+parent_id+") REFERENCES "+parent+"(id)"
         print(query)
         self.db1.execute(query)
+
+
+class XlsxDB:
+    def __init__(self,config_file="config.ini"):        
+        pass
+        """
+        db_details=read_connection_details(config_file)
+        locally=True
+        if db_details["LOCALLY"]=="False":
+            locally=False
+            
+        if locally:
+            self.DB_SERVER=db_details["DB_SERVER"]
+            self.DB_DATABASE=db_details["DB_DATABASE"]
+            self.DB_USERNAME = db_details["DB_USERNAME"]
+            self.DB_PASSWORD = db_details["DB_PASSWORD"]
+            self.connect_locally()
+        else:
+            self.DB_SERVER = db_details["DB_SERVER"]
+            self.DB_DATABASE = db_details["DB_DATABASE"]
+            self.DB_USERNAME = db_details["DB_USERNAME"]
+            self.DB_PASSWORD = db_details["DB_PASSWORD"]
+            self.connect_remotely()
+        """
+            
+    def execute(self,query):
+        pass
+        #self.cursor.execute(query)
+        #self.cursor.commit() 
+        
+    def close_connection(self):
+        pass
+        #self.connection.close()
+        #print("DB connection closed")  
+
+
+class XlsxTable:
+    def __init__(self,db1,name,columns=None,types=None):
+        super().__init__(db1,name,columns)
+        self.types=types
+
+
+#dataframe - dictionary auxiliary functions     
+def df_to_dict(df,column1,column2):
+    dictionary=df.set_index(column1).to_dict()[column2]
+    return(dictionary)
+
+def dict_to_df(dictionary,column1,column2):
+    df=pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
+    return(df)
