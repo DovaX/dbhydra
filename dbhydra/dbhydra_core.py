@@ -444,6 +444,34 @@ class XlsxTable(AbstractTable):
             print("Error: ",e)
             df=pd.DataFrame(columns=self.columns)
         return(df)      
+    
+    
+    def insert_from_df(self,df,batch=1,try_mode=False):
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
+        
+        original_df=self.select_to_df()
+        try:
+            original_df=original_df.drop(original_df.columns[0],axis=1)
+        except:
+            print("First column could not be dropped")
+        
+        df.columns=original_df.columns
+        #handling nan values -> change to NULL TODO
+        for column in list(df.columns):
+            df.loc[pd.isna(df[column]), column] = "NULL"
+
+        def concat_with_reset_index_in_second_df(original_df,df):
+            """Subsitute of reset_index method because we need to maintain the ids of original df"""
+            maximal_index=max(original_df.index)
+            df.index=df.index+maximal_index+1
+            original_df=original_df.append(df)
+            #df=pd.concat([original_df,df])
+            return(original_df)
+            
+        if len(original_df)>0:
+            df=concat_with_reset_index_in_second_df(original_df,df)
+        
+        df.to_excel(self.db1.name+"\\"+self.name+".xlsx")
 #dataframe - dictionary auxiliary functions     
 def df_to_dict(df,column1,column2):
     dictionary=df.set_index(column1).to_dict()[column2]
