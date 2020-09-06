@@ -472,6 +472,53 @@ class XlsxTable(AbstractTable):
             df=concat_with_reset_index_in_second_df(original_df,df)
         
         df.to_excel(self.db1.name+"\\"+self.name+".xlsx")
+    
+    def replace_from_df(self,df):
+        assert len(df.columns)==len(self.columns) #+1 because of id column
+        df.drop(df.columns[0],axis=1,inplace=True)
+        df.to_excel(self.db1.name+"\\"+self.name+".xlsx")  
+    
+    def update(self,variable_assign,where=None):
+        def split_assign(variable_assign):
+            variable=variable_assign.split("=")[0]
+            value=variable_assign.split("=")[1]
+            try:
+                value=int(value) #integers
+            except:
+                value=value.split("'")[1] #strings
+            return(variable,value)
+        
+        variable,value=split_assign(variable_assign)
+        df=self.select_to_df()
+        print(where)
+        print(variable,value)
+        if where is None:    
+            df[variable]=value  
+            print(df)
+        else:    
+            where_variable,where_value=split_assign(where)
+            df[variable] = df[where_variable].apply(lambda x: value if x==where_value else x)
+        self.replace_from_df(df)
+
+    def delete(self,where=None):    
+        def split_assign(variable_assign):
+            variable=variable_assign.split("=")[0]
+            value=variable_assign.split("=")[1]
+            try:
+                value=int(value) #integers
+            except:
+                value=value.split("'")[1] #strings
+            return(variable,value)
+       
+        df=self.select_to_df()
+        if where is None:    
+            df=df.iloc[0:0]
+            print(df)
+        else:    
+            where_variable,where_value=split_assign(where)
+            df.drop(df[df[where_variable]==where_value].index, inplace=True)
+        self.replace_from_df(df)
+        
 #dataframe - dictionary auxiliary functions     
 def df_to_dict(df,column1,column2):
     dictionary=df.set_index(column1).to_dict()[column2]
