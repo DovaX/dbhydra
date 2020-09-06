@@ -1,9 +1,13 @@
 """DB Hydra ORM"""
 
+
+
+
 import pyodbc
 import pandas as pd
 import pymysql as MySQLdb
 #import MySQLdb
+import pickle
 
 def read_file(file):
     """Reads txt file -> list"""
@@ -318,7 +322,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             query+=self.columns[i]+" "+self.types[i]+","
 
         query=query[:-1]
-        query+=")"        
+        query+=")"
         print(query)
         try:
             self.db1.execute(query)
@@ -414,12 +418,23 @@ class XlsxDB:
         pass
         #self.connection.close()
         #print("DB connection closed")  
+        
+        
+    def create_database(self,name):
+        pass
+        
 
 
 class XlsxTable:
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
+        
+        
+
+
+
+
 
 
 #dataframe - dictionary auxiliary functions     
