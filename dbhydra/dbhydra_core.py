@@ -427,6 +427,23 @@ class XlsxDB:
             print("Database is already created")
  
         
+class XlsxTable(AbstractTable):
+    def __init__(self,db1,name,columns=None,types=None):
+        super().__init__(db1,name,columns)
+        self.types=types
+        
+    def select_to_df(self):
+        try:
+            df=pd.read_excel(self.db1.name+"//"+self.name+".xlsx")
+            #cols=df.columns
+            #print(cols)
+            #df.set_index(cols[0],inplace=True)
+            #df.drop(df.columns[0],axis=1,inplace=True)
+        
+        except Exception as e:
+            print("Error: ",e)
+            df=pd.DataFrame(columns=self.columns)
+        return(df)      
 #dataframe - dictionary auxiliary functions     
 def df_to_dict(df,column1,column2):
     dictionary=df.set_index(column1).to_dict()[column2]
