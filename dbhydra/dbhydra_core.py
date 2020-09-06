@@ -383,6 +383,49 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         self.db1.execute(query)
 
 
+class XlsxDB:
+    def __init__(self,name="new_db",config_file="config.ini"):   
+        self.name=name
+        
+        """
+        db_details=read_connection_details(config_file)
+        locally=True
+        if db_details["LOCALLY"]=="False":
+            locally=False
+            
+        if locally:
+            self.DB_SERVER=db_details["DB_SERVER"]
+            self.DB_DATABASE=db_details["DB_DATABASE"]
+            self.DB_USERNAME = db_details["DB_USERNAME"]
+            self.DB_PASSWORD = db_details["DB_PASSWORD"]
+            self.connect_locally()
+        else:
+            self.DB_SERVER = db_details["DB_SERVER"]
+            self.DB_DATABASE = db_details["DB_DATABASE"]
+            self.DB_USERNAME = db_details["DB_USERNAME"]
+            self.DB_PASSWORD = db_details["DB_PASSWORD"]
+            self.connect_remotely()
+        """
+            
+    def execute(self,query):
+        pass
+        #self.cursor.execute(query)
+        #self.cursor.commit() 
+        
+    def close_connection(self):
+        pass
+        #self.connection.close()
+        #print("DB connection closed")  
+        
+        
+    def create_database(self):
+        import os
+        try:
+            os.mkdir(self.name)
+            print("Database created")
+        except:
+            print("Database is already created")
+ 
         
 #dataframe - dictionary auxiliary functions     
 def df_to_dict(df,column1,column2):
