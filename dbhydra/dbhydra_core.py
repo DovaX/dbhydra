@@ -89,6 +89,26 @@ class db(AbstractDB):
             table_dict[table]=Table.init_all_columns(self,table)
 
         return(table_dict)
+    
+    
+    def get_foreign_keys_columns(self):
+        sys_foreign_keys_columns_table=Table(self,"sys.foreign_key_columns",["parent_object_id","parent_column_id","referenced_object_id","referenced_column_id"],["int","int","int","int"])
+        query="select parent_object_id,parent_column_id,referenced_object_id,referenced_column_id from sys.foreign_key_columns"
+        rows=sys_foreign_keys_columns_table.select(query)
+        
+        sys_foreign_keys_columns_table=Table(self,"sys.tables",["object_id","name"],["int","nvarchar(100)"])
+        query="select object_id,name from sys.tables"
+        table_names=sys_foreign_keys_columns_table.select(query)
+        
+        table_id_name_dict={x[0]:x[1] for x in table_names}
+        
+        foreign_keys=[]
+        for i,row in enumerate(rows):
+            fk={"parent_table":table_id_name_dict[row[0]],"parent_column_id":row[1]-1,"referenced_table":table_id_name_dict[row[2]],"referenced_column_id":row[3]-1} #minus 1 because of indexing from 0  
+            foreign_keys.append(fk)
+        
+        return(foreign_keys)
+        
         
 class Mysqldb(AbstractDB):           
     def connect_locally(self):
@@ -303,6 +323,26 @@ class Table(Joinable,AbstractTable):
             query = "DELETE FROM "+self.name+" WHERE "+where
         print(query)
         self.db1.execute(query)
+        
+        
+    
+    def get_foreign_keys_for_table(self,table_dict,foreign_keys):
+        #table_dict is in format from db function: generate_table_dict()
+        #foreign_keys are in format from db function: get_foreign_keys_columns()
+        parent_foreign_keys=[]
+        for i,fk in enumerate(foreign_keys):
+            if fk["parent_table"]==self.name:
+                try:
+                    print(fk["parent_column_id"])
+                    print(self.columns)
+                    print(self.name)
+                    fk["parent_column_name"]=self.columns[fk["parent_column_id"]]
+                    fk["referenced_column_name"]=table_dict[fk["referenced_table"]].columns[fk["referenced_column_id"]]
+                    parent_foreign_keys.append(fk)
+                except IndexError as e:
+                    print("Warning: IndexError for foreign key self.columns[fk[parent_column_id]]:",e)
+        return(parent_foreign_keys)
+    
                 
        
 class MysqlTable(MysqlSelectable,AbstractTable):
