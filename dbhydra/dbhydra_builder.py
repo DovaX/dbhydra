@@ -1,5 +1,5 @@
 import dogui.dogui_core as dg
-import dbhydra as dh
+import dbhydra.dbhydra as dh
 
 db1=dh.Mysqldb("config.ini")
 
