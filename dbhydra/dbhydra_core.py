@@ -25,8 +25,9 @@ def read_connection_details(config_file):
     return(db_details)
 
 class AbstractDB:
-    def __init__(self,config_file="config.ini"):        
-        db_details=read_connection_details(config_file)
+    def __init__(self,config_file="config.ini",db_details=None):
+        if db_details is None:    
+            db_details=read_connection_details(config_file)
         locally=True
         if db_details["LOCALLY"]=="False":
             locally=False
