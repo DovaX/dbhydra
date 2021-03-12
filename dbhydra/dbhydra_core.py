@@ -61,8 +61,8 @@ class db(AbstractDB):
             r'SERVER=' + self.DB_SERVER + ';'
             r'DATABASE=' + self.DB_DATABASE + ';'
             r'UID=' + self.DB_USERNAME + ';'
-            r'PWD=' + self.DB_PASSWORD + ''
-        )         
+            r'PWD=' + self.DB_PASSWORD + '',timeout=1
+        )      
         self.cursor = self.connection.cursor()
         print("DB connection established")
 
@@ -71,9 +71,10 @@ class db(AbstractDB):
             r'DRIVER={ODBC Driver 13 for SQL Server};'
             r'SERVER=' + self.DB_SERVER + ';'
             r'DATABASE=' + self.DB_DATABASE + ';'
-            r'TRUSTED_CONNECTION=yes;'
-            #r'PWD=' + self.DB_PASSWORD + '') 
+            r'TRUSTED_CONNECTION=yes;',timeout=1
+            #r'PWD=' + self.DB_PASSWORD + '')
         )
+        
         self.cursor = self.connection.cursor()
         print("DB connection established")
     
@@ -125,6 +126,21 @@ class Mysqldb(AbstractDB):
     def execute(self,query):
         self.cursor.execute(query)
         self.connection.commit() 
+       
+    def get_all_tables(self):
+        sysobjects_table=Table(self, "information_schema.tables",["TABLE_NAME"],["nvarchar(100)"])
+        query="SELECT TABLE_NAME FROM information_schema.tables where TABLE_TYPE='BASE TABLE';"
+        rows=sysobjects_table.select(query)
+        print(rows)
+        return(rows) 
+       
+    def generate_table_dict(self):        
+        tables=self.get_all_tables()
+        table_dict=dict()
+        for i,table in enumerate(tables):
+            table_dict[table]=MysqlTable.init_all_columns(self,table)
+        return(table_dict)
+    
     
 #Tables 
 class AbstractSelectable:
@@ -350,6 +366,28 @@ class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
+     
+        
+    def get_all_columns(self):
+        information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS')
+        query="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
+        columns=information_schema_table.select(query)
+        return(columns)
+
+    def get_all_types(self):
+        information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
+        query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
+        types=information_schema_table.select(query)
+        return(types)
+        
+     
+    @classmethod
+    def init_all_columns(cls,db1,name):
+        temporary_table=cls(db1,name)
+        columns=temporary_table.get_all_columns()
+        types=temporary_table.get_all_types()
+        return(cls(db1,name,columns,types))
+        
         
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
