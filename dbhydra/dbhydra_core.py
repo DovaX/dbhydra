@@ -31,18 +31,20 @@ class AbstractDB:
         locally=True
         if db_details["LOCALLY"]=="False":
             locally=False
-            
+
+        self.DB_SERVER=db_details["DB_SERVER"]
+        self.DB_DATABASE=db_details["DB_DATABASE"]
+        self.DB_USERNAME = db_details["DB_USERNAME"]
+        self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        
+        if "DB_DRIVER" in db_details.keys():
+            self.DB_DRIVER = db_details["DB_DRIVER"]
+        else:
+            self.DB_DRIVER="ODBC Driver 13 for SQL Server"
+        
         if locally:
-            self.DB_SERVER=db_details["DB_SERVER"]
-            self.DB_DATABASE=db_details["DB_DATABASE"]
-            self.DB_USERNAME = db_details["DB_USERNAME"]
-            self.DB_PASSWORD = db_details["DB_PASSWORD"]
             self.connect_locally()
         else:
-            self.DB_SERVER = db_details["DB_SERVER"]
-            self.DB_DATABASE = db_details["DB_DATABASE"]
-            self.DB_USERNAME = db_details["DB_USERNAME"]
-            self.DB_PASSWORD = db_details["DB_PASSWORD"]
             self.connect_remotely()
             
     def execute(self,query):
@@ -56,8 +58,9 @@ class AbstractDB:
 
 class db(AbstractDB):
     def connect_remotely(self):
+        
         self.connection = pyodbc.connect(
-            r'DRIVER={ODBC Driver 13 for SQL Server};'
+            r'DRIVER={'+self.DB_DRIVER+'};'
             r'SERVER=' + self.DB_SERVER + ';'
             r'DATABASE=' + self.DB_DATABASE + ';'
             r'UID=' + self.DB_USERNAME + ';'
@@ -68,7 +71,7 @@ class db(AbstractDB):
 
     def connect_locally(self):
         self.connection = pyodbc.connect(
-            r'DRIVER={ODBC Driver 13 for SQL Server};'
+            r'DRIVER={'+self.DB_DRIVER+'};'
             r'SERVER=' + self.DB_SERVER + ';'
             r'DATABASE=' + self.DB_DATABASE + ';'
             r'TRUSTED_CONNECTION=yes;',timeout=1
