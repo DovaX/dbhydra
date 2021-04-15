@@ -132,10 +132,10 @@ class Mysqldb(AbstractDB):
        
     def get_all_tables(self):
         sysobjects_table=Table(self, "information_schema.tables",["TABLE_NAME"],["nvarchar(100)"])
-        query="SELECT TABLE_NAME FROM information_schema.tables where TABLE_TYPE='BASE TABLE';"
+        query="SELECT TABLE_NAME,TABLE_TYPE,TABLE_SCHEMA FROM information_schema.tables where TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='"+self.DB_DATABASE+"' ;"
         rows=sysobjects_table.select(query)
-        print(rows)
-        return(rows) 
+        tables=[x[0] for x in rows]
+        return(tables) 
        
     def generate_table_dict(self):        
         tables=self.get_all_tables()
