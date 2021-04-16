@@ -430,6 +430,10 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     if replace_apostrophes:
                         rows[k][j]=str(rows[k][j]).replace("'","")
                     query+="N'"+str(rows[k][j])+"',"
+                elif "varchar" in self.types[j+1]:
+                    if replace_apostrophes:
+                        rows[k][j]=str(rows[k][j]).replace("'","")
+                    query+="'"+str(rows[k][j])+"',"
                 elif self.types[j+1]=="int":
                     query+=str(rows[k][j])+","
                 elif "date" in self.types[j+1]:
