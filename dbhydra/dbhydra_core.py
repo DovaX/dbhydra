@@ -57,7 +57,7 @@ class AbstractDB:
         print("DB connection closed")  
 
 
-class AbstractDBNonSQL:
+class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
             db_details = read_connection_details(config_file)
@@ -163,7 +163,7 @@ class Mysqldb(AbstractDB):
             table_dict[table]=MysqlTable.init_all_columns(self,table)
         return(table_dict)
 
-class MyNonSqlDb(AbstractDBNonSQL):
+class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
         #self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
         self.connection = pymongo.MongoClient("mongodb+srv://" + self.DB_USERNAME + ":" + self.DB_PASSWORD +"@" + self.DB_SERVER + "/" + self.DB_DATABASE + "?retryWrites=true&w=majority")
@@ -176,9 +176,9 @@ class MyNonSqlDb(AbstractDBNonSQL):
         self.cursor.execute(query)
         self.connection.commit()
 
-    def get_all_collections(self):
+    def get_all_tables(self):
         return self.database.list_collection_names()
-    def createCollection(self, name):
+    def createTable(self, name):
         return self.database[name]
 
 
@@ -281,29 +281,35 @@ class AbstractTable(AbstractJoinable):
         rows=df.values.tolist()
         self.insert(rows,batch=batch,try_mode=try_mode)
 
-class Collection():
+class MongoTable():
     def __init__(self, db, name):
         self.name = name
         self.db = db
-        self.collection = self.db.createCollection(name)
+        self.collection = self.db.createTable(name)
     def drop(self):
         return self.collection.drop()
     def insert(self, document):
         return self.collection.insert_one(document)
+
     def insertMore(self, documents):
         return self.collection.insert_many(documents)
 
-    def find(self, query, columns={}):
+    def select(self, query, columns={}):
 
-        if(len(columns) == 0):
-            return self.collection.find(query)
-        else:
-            return self.collection.find(query, columns)
-    def findSort(self, query, fieldname, direction, columns={}):
         if (len(columns) == 0):
-            return self.collection.find(query).sort(fieldname, direction)
+
+            return list(self.collection.find(query))
         else:
-            return self.collection.find(query, columns).sort(fieldname, direction)
+            return list(self.collection.find(query, columns))
+
+    def select_all(self, query):
+        return list(self.collection.find(query))
+
+    def selectSort(self, query, fieldname, direction, columns={}):
+        if (len(columns) == 0):
+            return list(self.collection.find(query).sort(fieldname, direction))
+        else:
+            return list(self.collection.find(query, columns).sort(fieldname, direction))
     def delete(self, query={}):
         return self.collection.delete_many(query)
     def update(self, query, newvalues):
