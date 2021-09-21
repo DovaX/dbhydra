@@ -1,4 +1,6 @@
 """DB Hydra ORM"""
+from functools import reduce
+
 import pymongo
 import pyodbc
 import pandas as pd
@@ -74,7 +76,6 @@ class AbstractDBMongo:
         else:
             self.connect_remotely()
 
-        #TODO, execute, close
 class db(AbstractDB):
     def connect_remotely(self):
         
@@ -180,8 +181,16 @@ class MongoDb(AbstractDBMongo):
         return self.database.list_collection_names()
     def createTable(self, name):
         return self.database[name]
+    def close_connection(self):
+        self.connection.close()
+        print("DB connection closed.")
+    def generate_table_dict(self):
+        tables=self.get_all_tables()
+        table_dict=dict()
+        for i,table in enumerate(tables):
+            table_dict[table]=MongoTable.init_all_columns(self, table)
 
-
+        return(table_dict)
 #Tables 
 class AbstractSelectable:
     def __init__(self,db1,name,columns=None):  
@@ -213,7 +222,7 @@ class AbstractSelectable:
                     list1.append(row[i])
                 cleared_rows_list.append(list1)  
         return(cleared_rows_list)
-     
+
     def select_all(self):
         list1=self.select("SELECT * FROM "+self.name)
         return(list1)
@@ -282,10 +291,15 @@ class AbstractTable(AbstractJoinable):
         self.insert(rows,batch=batch,try_mode=try_mode)
 
 class MongoTable():
-    def __init__(self, db, name):
+    def __init__(self, db, name, columns = [], types = []):
         self.name = name
         self.db = db
+        print("==========================================")
+        print(type(db))
+        print(db)
         self.collection = self.db.createTable(name)
+        self.columns=columns
+        self.types = types
     def drop(self):
         return self.collection.drop()
     def insert(self, document):
@@ -302,7 +316,7 @@ class MongoTable():
         else:
             return list(self.collection.find(query, columns))
 
-    def select_all(self, query):
+    def select_all(self, query = {}):
         return list(self.collection.find(query))
 
     def selectSort(self, query, fieldname, direction, columns={}):
@@ -316,6 +330,80 @@ class MongoTable():
         return self.collection.update(query, newvalues)
     def insertFromDataFrame(self, dataframe):
         return self.collection.insert_many(dataframe.to_dict)
+    def select_to_df(self, query = {}):
+        print(type(pd.DataFrame(list(self.collection.find(query)))))
+        print(pd.DataFrame(list(self.collection.find(query))))
+        return pd.DataFrame(list(self.collection.find(query)))
+
+    @classmethod
+    def init_all_columns(cls, db1, name):
+
+        temporary_table = cls(db1, name)
+        values = temporary_table.get_columns_types()
+        columns = values[0]
+        types = values[1]
+        return (cls(db1, name, columns, types))
+
+    def keys_exists(self, element, *keys):
+        '''
+        Check if *keys (nested) exists in `element` (dict).
+        '''
+        if not isinstance(element, dict):
+            raise AttributeError('keys_exists() expects dict as first argument.')
+        if len(keys) == 0:
+            raise AttributeError('keys_exists() expects at least two arguments, one given.')
+
+        _element = element
+        for key in keys:
+            try:
+                _element = _element[key]
+            except KeyError:
+                return False
+        return True
+    def print_nested_keys(self, d, columns,types, parent=""):
+
+        for k in d.keys():
+
+            typ = type(d.get(k)).__name__
+
+            if self.keys_exists(types,k, typ):
+                types[k][typ] = types[k][typ] + 1
+            else:
+                try:
+                    types[k][typ] = 1
+                except:
+                    types[k] = {}
+                    types[k][typ] = 1
+            if parent+k not in columns:
+                columns.append(parent+k)
+            if type(d[k]) == dict:
+                self.print_nested_keys(d[k],columns,types, parent + k + ".")
+
+    def get_columns_types(self):
+        columns = []
+        types = {}
+        for dict_j in self.collection.find():
+            self.print_nested_keys(dict_j,  columns, types )
+        types = self.get_all_types(types)
+        return columns, types
+    def get_all_types(self, types):
+        print(types)
+        print("AAA")
+        types_list = []
+        for k in types.keys():
+            values = types.get(k)
+            if(len(values) == 1):
+
+                types_list.append(next(iter(values)))
+            else:
+                chosen = ""
+                chosen_cnt = 0
+                for t in values.keys():
+                    if values.get(t) > chosen_cnt:
+                        chosen = t
+                types_list.append(chosen + " ?")
+        print(types_list)
+        return types_list
 class Table(Joinable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         """Override joinable init"""
