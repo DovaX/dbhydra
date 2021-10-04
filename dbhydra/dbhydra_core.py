@@ -5,6 +5,8 @@ import pymongo
 import pyodbc
 import pandas as pd
 import pymysql as MySQLdb
+import psycopg2
+from psycopg2 import sql
 #import MySQLdb
 import pickle
 
@@ -58,7 +60,26 @@ class AbstractDB:
         self.connection.close()
         print("DB connection closed")  
 
+class AbstractDBPostgres:
+    def __init__(self, config_file="config-mongo.ini", db_details=None):
+        if db_details is None:
+            db_details = read_connection_details(config_file)
+        locally = True
+        if db_details["LOCALLY"] == "False":
+            locally = False
 
+        self.DB_SERVER = db_details["DB_SERVER"]
+        self.DB_DATABASE = db_details["DB_DATABASE"]
+        self.DB_USERNAME = db_details["DB_USERNAME"]
+        self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if locally:
+            self.connect_locally()
+        else:
+            self.connect_remotely()
+
+    def close_connection(self):
+        self.cursor.close()
+        print("DB connection closed")
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
@@ -164,6 +185,30 @@ class Mysqldb(AbstractDB):
             table_dict[table]=MysqlTable.init_all_columns(self,table)
         return(table_dict)
 
+class PostgresDb(AbstractDBPostgres):
+    def connect_remotely(self):
+        self.connection = psycopg2.connect(
+    host=self.DB_SERVER,
+    database=self.DB_DATABASE,
+    user=self.DB_USERNAME,
+    password=self.DB_PASSWORD)
+        self.cursor = self.connection.cursor()
+    def execute(self, query):
+
+        self.cursor.execute(query)
+        return  [''.join(i) for i in self.cursor.fetchall()]
+    def get_all_tables(self):
+        self.cursor.execute("""SELECT table_name FROM information_schema.tables
+               WHERE table_schema = 'public'""")
+        return [''.join(i) for i in self.cursor.fetchall()]
+    def generate_table_dict(self):
+        tables=self.get_all_tables()
+        table_dict=dict()
+        for i,table in enumerate(tables):
+            table_dict[table]=PostgresTable.init_all_columns(self, table)
+
+        return(table_dict)
+
 class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
         #self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
@@ -202,6 +247,7 @@ class AbstractSelectable:
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         self.db1.cursor.execute(query)
+        print(query)
         column_string=query.lower().split("from")[0]
         if "*" in column_string:
             columns=len(self.columns)
@@ -210,6 +256,7 @@ class AbstractSelectable:
         else:
             columns = len(column_string.split(","))
         rows = self.db1.cursor.fetchall()
+
         if columns==1:
             cleared_rows_list = [item[0] for item in rows]
         
@@ -290,6 +337,32 @@ class AbstractTable(AbstractJoinable):
         rows=df.values.tolist()
         self.insert(rows,batch=batch,try_mode=try_mode)
 
+class PostgresTable(AbstractTable):
+    def __init__(self, db1, name, columns = None, types = None):
+        super().__init__(db1,name,columns)
+        print("==========================================")
+
+        self.columns= self.get_all_columns()
+        self.types = types
+    def get_all_columns(self):
+
+        return self.db1.execute("SELECT column_name FROM	"
+                        "INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE	table_name = '{}';".format(self.name))
+    def get_all_types(self):
+        information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
+        query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
+        types=information_schema_table.select(query)
+        return(types)
+    def select_all(self):
+        print(super().select_all())
+        return  [i for i in super().select_all()]
+    @classmethod
+    def init_all_columns(cls,db1,name):
+        temporary_table=cls(db1,name)
+        columns=temporary_table.get_all_columns()
+        types=temporary_table.get_all_types()
+        return(cls(db1,name,columns,types))
 class MongoTable():
     def __init__(self, db, name, columns = [], types = []):
         self.name = name
@@ -388,7 +461,6 @@ class MongoTable():
         return columns, types
     def get_all_types(self, types):
         print(types)
-        print("AAA")
         types_list = []
         for k in types.keys():
             values = types.get(k)
@@ -404,6 +476,7 @@ class MongoTable():
                 types_list.append(chosen + " ?")
         print(types_list)
         return types_list
+
 class Table(Joinable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         """Override joinable init"""

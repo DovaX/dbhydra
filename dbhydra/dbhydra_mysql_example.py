@@ -1,12 +1,32 @@
-import dbhydra as dh
-import pandas as pd
+
 
 import dbhydra_core
 from random import randint
 #db1=dh.Mysqldb() #MongoDB connect to db a
-db2 = dbhydra_core.MongoDb()
-collections = db2.get_all_tables() #list of collections
-print("Collections:" + ''.join(collections))
+#db2 = dbhydra_core.MongoDb()
+db3 = dbhydra_core.PostgresDb()
+
+tables = db3.get_all_tables()
+print(tables)
+print(tables[6])
+table = tables[6]
+tableP = dbhydra_core.PostgresTable(db3, table)
+
+print("select")
+print(tableP.select_all())
+print(tableP.select_to_df())
+c = tableP.get_all_columns()
+print(tableP.get_all_types())
+print("init")
+s = tableP.init_all_columns(db3, table)
+print(s)
+print(db3.generate_table_dict())
+print(tableP.get_all_types())
+print(c)
+db3.close_connection()
+exit()
+#collections = db2.get_all_tables() #list of collections
+#print("Collections:" + ''.join(collections))
 a = {
     "url": "google.com",
     "statusCode": 301,
@@ -46,7 +66,7 @@ print(collection1.select_to_df({}))
 print(collection1.get_columns_types())
 
 exit()
-names = ['Kitchen','Animal','State', 'Tastey', 'Big','City','Fish', 'Pizza','Goat', 'Salty','Sandwich','Lazy', 'Fun']
+names = ['Kitchen','Animal','Statye', 'Tastey', 'Big','City','Fish', 'Pizza','Goat', 'Salty','Sandwich','Lazy', 'Fun']
 company_type = ['LLC','Inc','Company','Corporation']
 company_cuisine = ['Pizza', 'Bar Food', 'Fast Food', 'Italian', 'Mexican', 'American', 'Sushi Bar', 'Vegetarian']
 for x in range(1, 501):
