@@ -467,6 +467,21 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         query="ALTER TABLE "+self.name+" ADD FOREIGN KEY ("+parent_id+") REFERENCES "+parent+"(id)"
         print(query)
         self.db1.execute(query)
+        
+        
+    def add_column(self,column_name,column_type):
+        command="ALTER TABLE "+self.name+" ADD COLUMN "+column_name+" "+column_type
+        self.db1.execute(command)
+        
+    def drop_column(self,column_name):
+        command="ALTER TABLE "+self.name+" DROP COLUMN "+column_name
+        self.db1.execute(command)
+
+    def modify_column(self,column_name,new_column_type):
+        command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
+        self.db1.execute(command)
+
+        
 
 
 class XlsxDB:
