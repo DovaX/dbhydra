@@ -1,5 +1,5 @@
 """DB Hydra ORM"""
-
+import pymongo
 import pyodbc
 import pandas as pd
 import pymysql as MySQLdb
@@ -8,6 +8,7 @@ import pickle
 
 def read_file(file):
     """Reads txt file -> list"""
+
     with open(file,"r") as f:
         rows = f.readlines()
         for i,row in enumerate(rows):
@@ -56,6 +57,24 @@ class AbstractDB:
         print("DB connection closed")  
 
 
+class AbstractDBMongo:
+    def __init__(self, config_file="config-mongo.ini", db_details=None):
+        if db_details is None:
+            db_details = read_connection_details(config_file)
+        locally = True
+        if db_details["LOCALLY"] == "False":
+            locally = False
+
+        self.DB_SERVER = db_details["DB_SERVER"]
+        self.DB_DATABASE = db_details["DB_DATABASE"]
+        self.DB_USERNAME = db_details["DB_USERNAME"]
+        self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if locally:
+            self.connect_locally()
+        else:
+            self.connect_remotely()
+
+        #TODO, execute, close
 class db(AbstractDB):
     def connect_remotely(self):
         
@@ -143,8 +162,26 @@ class Mysqldb(AbstractDB):
         for i,table in enumerate(tables):
             table_dict[table]=MysqlTable.init_all_columns(self,table)
         return(table_dict)
-    
-    
+
+class MongoDb(AbstractDBMongo):
+    def connect_remotely(self):
+        #self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
+        self.connection = pymongo.MongoClient("mongodb+srv://" + self.DB_USERNAME + ":" + self.DB_PASSWORD +"@" + self.DB_SERVER + "/" + self.DB_DATABASE + "?retryWrites=true&w=majority")
+        print(self.connection.list_database_names())
+        self.database = self.connection[self.DB_DATABASE]
+        print(self.database)
+        print("DB connection established")
+
+    def execute(self, query):
+        self.cursor.execute(query)
+        self.connection.commit()
+
+    def get_all_tables(self):
+        return self.database.list_collection_names()
+    def createTable(self, name):
+        return self.database[name]
+
+
 #Tables 
 class AbstractSelectable:
     def __init__(self,db1,name,columns=None):  
@@ -244,7 +281,41 @@ class AbstractTable(AbstractJoinable):
         rows=df.values.tolist()
         self.insert(rows,batch=batch,try_mode=try_mode)
 
+class MongoTable():
+    def __init__(self, db, name):
+        self.name = name
+        self.db = db
+        self.collection = self.db.createTable(name)
+    def drop(self):
+        return self.collection.drop()
+    def insert(self, document):
+        return self.collection.insert_one(document)
 
+    def insertMore(self, documents):
+        return self.collection.insert_many(documents)
+
+    def select(self, query, columns={}):
+
+        if (len(columns) == 0):
+
+            return list(self.collection.find(query))
+        else:
+            return list(self.collection.find(query, columns))
+
+    def select_all(self, query):
+        return list(self.collection.find(query))
+
+    def selectSort(self, query, fieldname, direction, columns={}):
+        if (len(columns) == 0):
+            return list(self.collection.find(query).sort(fieldname, direction))
+        else:
+            return list(self.collection.find(query, columns).sort(fieldname, direction))
+    def delete(self, query={}):
+        return self.collection.delete_many(query)
+    def update(self, query, newvalues):
+        return self.collection.update(query, newvalues)
+    def insertFromDataFrame(self, dataframe):
+        return self.collection.insert_many(dataframe.to_dict)
 class Table(Joinable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         """Override joinable init"""
