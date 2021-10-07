@@ -1,13 +1,18 @@
 """DB Hydra ORM"""
+from functools import reduce
 
+import pymongo
 import pyodbc
 import pandas as pd
 import pymysql as MySQLdb
+import psycopg2
+from psycopg2 import sql
 #import MySQLdb
 import pickle
 
 def read_file(file):
     """Reads txt file -> list"""
+
     with open(file,"r") as f:
         rows = f.readlines()
         for i,row in enumerate(rows):
@@ -55,6 +60,42 @@ class AbstractDB:
         self.connection.close()
         print("DB connection closed")  
 
+class AbstractDBPostgres:
+    def __init__(self, config_file="config-mongo.ini", db_details=None):
+        if db_details is None:
+            db_details = read_connection_details(config_file)
+        locally = True
+        if db_details["LOCALLY"] == "False":
+            locally = False
+
+        self.DB_SERVER = db_details["DB_SERVER"]
+        self.DB_DATABASE = db_details["DB_DATABASE"]
+        self.DB_USERNAME = db_details["DB_USERNAME"]
+        self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if locally:
+            self.connect_locally()
+        else:
+            self.connect_remotely()
+
+    def close_connection(self):
+        self.cursor.close()
+        print("DB connection closed")
+class AbstractDBMongo:
+    def __init__(self, config_file="config-mongo.ini", db_details=None):
+        if db_details is None:
+            db_details = read_connection_details(config_file)
+        locally = True
+        if db_details["LOCALLY"] == "False":
+            locally = False
+
+        self.DB_SERVER = db_details["DB_SERVER"]
+        self.DB_DATABASE = db_details["DB_DATABASE"]
+        self.DB_USERNAME = db_details["DB_USERNAME"]
+        self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if locally:
+            self.connect_locally()
+        else:
+            self.connect_remotely()
 
 class db(AbstractDB):
     def connect_remotely(self):
@@ -143,8 +184,58 @@ class Mysqldb(AbstractDB):
         for i,table in enumerate(tables):
             table_dict[table]=MysqlTable.init_all_columns(self,table)
         return(table_dict)
-    
-    
+
+class PostgresDb(AbstractDBPostgres):
+    def connect_remotely(self):
+        self.connection = psycopg2.connect(
+    host=self.DB_SERVER,
+    database=self.DB_DATABASE,
+    user=self.DB_USERNAME,
+    password=self.DB_PASSWORD)
+        self.cursor = self.connection.cursor()
+    def execute(self, query):
+
+        self.cursor.execute(query)
+        return  [''.join(i) for i in self.cursor.fetchall()]
+    def get_all_tables(self):
+        self.cursor.execute("""SELECT table_name FROM information_schema.tables
+               WHERE table_schema = 'public'""")
+        return [''.join(i) for i in self.cursor.fetchall()]
+    def generate_table_dict(self):
+        tables=self.get_all_tables()
+        table_dict=dict()
+        for i,table in enumerate(tables):
+            table_dict[table]=PostgresTable.init_all_columns(self, table)
+
+        return(table_dict)
+
+class MongoDb(AbstractDBMongo):
+    def connect_remotely(self):
+        #self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
+        self.connection = pymongo.MongoClient("mongodb+srv://" + self.DB_USERNAME + ":" + self.DB_PASSWORD +"@" + self.DB_SERVER + "/" + self.DB_DATABASE + "?retryWrites=true&w=majority")
+        print(self.connection.list_database_names())
+        self.database = self.connection[self.DB_DATABASE]
+        print(self.database)
+        print("DB connection established")
+
+    def execute(self, query):
+        self.cursor.execute(query)
+        self.connection.commit()
+
+    def get_all_tables(self):
+        return self.database.list_collection_names()
+    def createTable(self, name):
+        return self.database[name]
+    def close_connection(self):
+        self.connection.close()
+        print("DB connection closed.")
+    def generate_table_dict(self):
+        tables=self.get_all_tables()
+        table_dict=dict()
+        for i,table in enumerate(tables):
+            table_dict[table]=MongoTable.init_all_columns(self, table)
+
+        return(table_dict)
 #Tables 
 class AbstractSelectable:
     def __init__(self,db1,name,columns=None):  
@@ -156,6 +247,7 @@ class AbstractSelectable:
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         self.db1.cursor.execute(query)
+        print(query)
         column_string=query.lower().split("from")[0]
         if "*" in column_string:
             columns=len(self.columns)
@@ -164,6 +256,7 @@ class AbstractSelectable:
         else:
             columns = len(column_string.split(","))
         rows = self.db1.cursor.fetchall()
+
         if columns==1:
             cleared_rows_list = [item[0] for item in rows]
         
@@ -176,7 +269,7 @@ class AbstractSelectable:
                     list1.append(row[i])
                 cleared_rows_list.append(list1)  
         return(cleared_rows_list)
-     
+
     def select_all(self):
         list1=self.select("SELECT * FROM "+self.name)
         return(list1)
@@ -244,6 +337,145 @@ class AbstractTable(AbstractJoinable):
         rows=df.values.tolist()
         self.insert(rows,batch=batch,try_mode=try_mode)
 
+class PostgresTable(AbstractTable):
+    def __init__(self, db1, name, columns = None, types = None):
+        super().__init__(db1,name,columns)
+        print("==========================================")
+
+        self.columns= self.get_all_columns()
+        self.types = types
+    def get_all_columns(self):
+
+        return self.db1.execute("SELECT column_name FROM	"
+                        "INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE	table_name = '{}';".format(self.name))
+    def get_all_types(self):
+        information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
+        query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
+        types=information_schema_table.select(query)
+        return(types)
+    def select_all(self):
+        print(super().select_all())
+        return  [i for i in super().select_all()]
+    @classmethod
+    def init_all_columns(cls,db1,name):
+        temporary_table=cls(db1,name)
+        columns=temporary_table.get_all_columns()
+        types=temporary_table.get_all_types()
+        return(cls(db1,name,columns,types))
+class MongoTable():
+    def __init__(self, db, name, columns = [], types = []):
+        self.name = name
+        self.db = db
+        print("==========================================")
+        print(type(db))
+        print(db)
+        self.collection = self.db.createTable(name)
+        self.columns=columns
+        self.types = types
+    def drop(self):
+        return self.collection.drop()
+    def insert(self, document):
+        return self.collection.insert_one(document)
+
+    def insertMore(self, documents):
+        return self.collection.insert_many(documents)
+
+    def select(self, query, columns={}):
+
+        if (len(columns) == 0):
+
+            return list(self.collection.find(query))
+        else:
+            return list(self.collection.find(query, columns))
+
+    def select_all(self, query = {}):
+        return list(self.collection.find(query))
+
+    def selectSort(self, query, fieldname, direction, columns={}):
+        if (len(columns) == 0):
+            return list(self.collection.find(query).sort(fieldname, direction))
+        else:
+            return list(self.collection.find(query, columns).sort(fieldname, direction))
+    def delete(self, query={}):
+        return self.collection.delete_many(query)
+    def update(self, query, newvalues):
+        return self.collection.update(query, newvalues)
+    def insertFromDataFrame(self, dataframe):
+        return self.collection.insert_many(dataframe.to_dict)
+    def select_to_df(self, query = {}):
+        print(type(pd.DataFrame(list(self.collection.find(query)))))
+        print(pd.DataFrame(list(self.collection.find(query))))
+        return pd.DataFrame(list(self.collection.find(query)))
+
+    @classmethod
+    def init_all_columns(cls, db1, name):
+
+        temporary_table = cls(db1, name)
+        values = temporary_table.get_columns_types()
+        columns = values[0]
+        types = values[1]
+        return (cls(db1, name, columns, types))
+
+    def keys_exists(self, element, *keys):
+        '''
+        Check if *keys (nested) exists in `element` (dict).
+        '''
+        if not isinstance(element, dict):
+            raise AttributeError('keys_exists() expects dict as first argument.')
+        if len(keys) == 0:
+            raise AttributeError('keys_exists() expects at least two arguments, one given.')
+
+        _element = element
+        for key in keys:
+            try:
+                _element = _element[key]
+            except KeyError:
+                return False
+        return True
+    def print_nested_keys(self, d, columns,types, parent=""):
+
+        for k in d.keys():
+
+            typ = type(d.get(k)).__name__
+
+            if self.keys_exists(types,k, typ):
+                types[k][typ] = types[k][typ] + 1
+            else:
+                try:
+                    types[k][typ] = 1
+                except:
+                    types[k] = {}
+                    types[k][typ] = 1
+            if parent+k not in columns:
+                columns.append(parent+k)
+            if type(d[k]) == dict:
+                self.print_nested_keys(d[k],columns,types, parent + k + ".")
+
+    def get_columns_types(self):
+        columns = []
+        types = {}
+        for dict_j in self.collection.find():
+            self.print_nested_keys(dict_j,  columns, types )
+        types = self.get_all_types(types)
+        return columns, types
+    def get_all_types(self, types):
+        print(types)
+        types_list = []
+        for k in types.keys():
+            values = types.get(k)
+            if(len(values) == 1):
+
+                types_list.append(next(iter(values)))
+            else:
+                chosen = ""
+                chosen_cnt = 0
+                for t in values.keys():
+                    if values.get(t) > chosen_cnt:
+                        chosen = t
+                types_list.append(chosen + " ?")
+        print(types_list)
+        return types_list
 
 class Table(Joinable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
