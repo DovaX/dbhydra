@@ -25,6 +25,88 @@ def read_connection_details(config_file):
     print(", ".join([db_details['DB_SERVER'],db_details['DB_DATABASE'],db_details['DB_USERNAME']]))
     return(db_details)
 
+
+
+import json
+
+
+
+
+    
+def save_migration(function): #decorator
+    def new_function(instance,*args,**kw):
+        #print(kw,**kw)
+        command=function.__name__
+        if command=="create":
+            migration_dict={"create":{"table_name":instance.name,"columns":instance.columns,"types":instance.types}}
+            print(migration_dict)
+        #TODO: add other methods
+        
+        migrator=instance.db1.migrator
+        migrator.migration_list.append(migration_dict)
+        migrator.migration_list_to_json()
+            
+        
+        function(instance,*args,**kw)
+    return(new_function)
+
+        
+
+class Migrator:
+    def __init__(self,db):
+        self.db=db
+        self.migration_number=1
+        self.migration_list=[]
+
+    def process_migration_dict(self,migration_dict):
+        assert len(migration_dict.keys())==1
+        operation=list(migration_dict.keys())[0]
+        options=migration_dict[operation]
+        if operation=="create":
+            table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
+            table.create()
+        elif operation=="drop":
+            table=MysqlTable(self.db,options["table_name"])
+            table.drop()
+        elif operation=="add_column":
+            table=MysqlTable(self.db,options["table_name"])
+            table.add_column(options["column_name"],options["column_type"])
+        elif operation=="modify_column":
+            table=MysqlTable(self.db,options["table_name"])
+            table.modify_column(options["column_name"],options["column_type"])
+        elif operation=="drop_column":
+            table=MysqlTable(self.db,options["table_name"])
+            table.drop_column(options["column_name"])
+            
+    def next_migration(self):
+        self.migration_number+=1
+        self.migration_list=[]
+            
+      
+    def migrate(self,migration_list):
+        for i,migration_dict in enumerate(migration_list):
+            self.process_migration_dict(migration_dict)
+           
+            
+    def migrate_from_json(self,filename):
+        with open(filename,"r") as f:
+            rows=f.readlines()[0].replace("\n","")
+            print(rows)
+        result=json.loads(rows)
+        return(result)
+        
+        
+    def migration_list_to_json(self):
+        result=json.dumps(self.migration_list)
+        
+        with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
+            f.write(result)
+     
+
+
+
+
+
 class AbstractDB:
     def __init__(self,config_file="config.ini",db_details=None):
         if db_details is None:    
@@ -55,7 +137,11 @@ class AbstractDB:
     def close_connection(self):
         self.connection.close()
         print("DB connection closed")  
+        
+    def initialize_migrator(self):
+        self.migrator=Migrator(self)
 
+        
 
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
@@ -162,6 +248,9 @@ class Mysqldb(AbstractDB):
         for i,table in enumerate(tables):
             table_dict[table]=MysqlTable.init_all_columns(self,table)
         return(table_dict)
+    
+   
+    
 
 class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
@@ -433,8 +522,8 @@ class Table(Joinable,AbstractTable):
                 except IndexError as e:
                     print("Warning: IndexError for foreign key self.columns[fk[parent_column_id]]:",e)
         return(parent_foreign_keys)
-    
-                
+
+             
        
 class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
@@ -462,7 +551,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
-        
+    @save_migration
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
         assert self.columns[0]=="id"
