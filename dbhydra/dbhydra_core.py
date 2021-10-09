@@ -37,12 +37,29 @@ import json
 
 
 
-def save_migration(function): #decorator
-    def new_function(instance,*args,**kw):
-        #print(kw,**kw)
+def save_migration(function, *args, **kw): #decorator
+    def new_function(instance, *args, **kw):
+        print("TOTO TU")
+        print(instance)
+        print(*args)
         command=function.__name__
         if command=="create":
             migration_dict={"create":{"table_name":instance.name,"columns":instance.columns,"types":instance.types}}
+            print(migration_dict)
+        if command=="drop":
+            migration_dict={"drop":{"table_name":instance.name}}
+            print(migration_dict)
+        if command=="add_column":
+            migration_dict = {
+                "add_column": {"table_name": instance.name, "column_name": args[0], "column_type": args[1]}}
+            print(migration_dict)
+        if command == "drop_column":
+            migration_dict = {
+                "drop_column": {"table_name": instance.name, "column_name": args[0]}}
+            print(migration_dict)
+        if command == "modify_column":
+            migration_dict = {
+                "modify_column": {"table_name": instance.name, "column_name": args[0], "column_type": args[1]}}
             print(migration_dict)
         #TODO: add other methods
 
@@ -65,7 +82,11 @@ class Migrator:
     def process_migration_dict(self,migration_dict):
         assert len(migration_dict.keys())==1
         operation=list(migration_dict.keys())[0]
+        print(type(self.db))
+        print("operation")
+        print(operation)
         options=migration_dict[operation]
+        print(options)
         if operation=="create":
             table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
             table.create()
@@ -97,6 +118,12 @@ class Migrator:
             rows=f.readlines()[0].replace("\n","")
             print(rows)
         result=json.loads(rows)
+        print(len(result))
+        for dict in result:
+            print("TOTO TU TIEZ")
+            print(type(dict))
+            print(dict)
+            self.process_migration_dict(dict)
         return(result)
 
 
@@ -245,7 +272,7 @@ class db(AbstractDB):
         
 class Mysqldb(AbstractDB):           
     def connect_locally(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,db=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -402,7 +429,7 @@ class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-
+    @save_migration
     def drop(self):
         query="DROP TABLE "+self.name
         print(query)
@@ -787,16 +814,22 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         print(query)
         self.db1.execute(query)
 
-
+    @save_migration
     def add_column(self,column_name,column_type):
+        assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" ADD COLUMN "+column_name+" "+column_type
         self.db1.execute(command)
-
+    @save_migration
     def drop_column(self,column_name):
+        assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" DROP COLUMN "+column_name
-        self.db1.execute(command)
-
+        try:
+            self.db1.execute(command)
+        except Exception as e:
+            print("Cant drop "+self.name)
+    @save_migration
     def modify_column(self,column_name,new_column_type):
+        assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
         self.db1.execute(command)
 
