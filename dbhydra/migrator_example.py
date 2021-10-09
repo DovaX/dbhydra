@@ -3,11 +3,30 @@ import dbhydra_core as dh
 
 db1=dh.Mysqldb("config-mysql.ini")
 
+db2 = dh.PostgresDb("config-mongo.ini")
+
+db2.initialize_migrator()
 db1.initialize_migrator()
+'''
 
 
+#table1=dh.MysqlTable(db1,"test_table3",["id","test1"],["int","int"])
+table2=dh.PostgresTable(db2,"test_table4",["id","test1"],["int","integer"])
+table2.create()
+table2.drop()
+table2.create()
+table2.create()
 
-table1=dh.MysqlTable(db1,"test_table3",["id","test1"],["int","int"])
+table2.add_column("new_col","int")
+
+table2.drop_column("new_col2")
+table2.drop_column("new_col")
+table2.add_column("new_col2","int")
+
+table2.modify_column("new_col2","varchar(10)")
+
+#table2.drop()'''
+#exit()
 '''
 table1.create()
 table1.drop()
@@ -38,9 +57,10 @@ migration_dict5={"drop":{"table_name":"new_table"}}
 
 migration_list1=[migration_dict,migration_dict2,migration_dict3,migration_dict4,migration_dict]
 
-db1.migrator.next_migration()
+db2.migrator.next_migration()
 
-migration_list=db1.migrator.migrate_from_json("migrations//migration-2.json")
+migration_list=db2.migrator.migrate_from_json("migrations//migration-1.json")
+db1.migrator.migrate_from_json("migrations//migration-2.json")
 print(type(migration_list))
 print(migration_list)
 

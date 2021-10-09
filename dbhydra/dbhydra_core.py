@@ -83,24 +83,40 @@ class Migrator:
         assert len(migration_dict.keys())==1
         operation=list(migration_dict.keys())[0]
         print(type(self.db))
+
         print("operation")
         print(operation)
         options=migration_dict[operation]
         print(options)
         if operation=="create":
-            table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db,options["table_name"],options["columns"],options["types"])
             table.create()
         elif operation=="drop":
-            table=MysqlTable(self.db,options["table_name"])
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
             table.drop()
         elif operation=="add_column":
-            table=MysqlTable(self.db,options["table_name"])
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
             table.add_column(options["column_name"],options["column_type"])
         elif operation=="modify_column":
-            table=MysqlTable(self.db,options["table_name"])
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
             table.modify_column(options["column_name"],options["column_type"])
         elif operation=="drop_column":
-            table=MysqlTable(self.db,options["table_name"])
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
             table.drop_column(options["column_name"])
 
     def next_migration(self):
@@ -120,7 +136,6 @@ class Migrator:
         result=json.loads(rows)
         print(len(result))
         for dict in result:
-            print("TOTO TU TIEZ")
             print(type(dict))
             print(dict)
             self.process_migration_dict(dict)
@@ -193,6 +208,8 @@ class AbstractDBPostgres:
     def close_connection(self):
         self.cursor.close()
         print("DB connection closed")
+    def initialize_migrator(self):
+        self.migrator=Migrator(self)
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
@@ -306,11 +323,12 @@ class PostgresDb(AbstractDBPostgres):
     database=self.DB_DATABASE,
     user=self.DB_USERNAME,
     password=self.DB_PASSWORD)
+        self.connection.autocommit = True
         self.cursor = self.connection.cursor()
     def execute(self, query):
-
         self.cursor.execute(query)
-        return  [''.join(i) for i in self.cursor.fetchall()]
+
+        #return  [''.join(i) for i in self.cursor.fetchall()]
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
@@ -458,7 +476,7 @@ class PostgresTable(AbstractTable):
         super().__init__(db1,name,columns)
         print("==========================================")
 
-        self.columns= self.get_all_columns()
+        self.columns= columns
         self.types = types
     def get_all_columns(self):
 
@@ -479,6 +497,46 @@ class PostgresTable(AbstractTable):
         columns=temporary_table.get_all_columns()
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
+
+    @save_migration
+    def create(self, foreign_keys=None):
+        assert len(self.columns) == len(self.types)
+        assert self.columns[0] == "id"
+        assert self.types[0] == "int"
+        query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
+        for i in range(1, len(self.columns)):
+            query += self.columns[i] + " " + self.types[i] + ","
+
+        query = query[:-1]
+        query += ")"
+        print(query)
+        try:
+            self.db1.cursor.execute(query)
+        except Exception as e:
+            print("Table " + self.name + " already exists:", e)
+            print("Check the specification of table columns and their types")
+
+    @save_migration
+    def add_column(self, column_name, column_type):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        self.db1.execute(command)
+
+    @save_migration
+    def drop_column(self, column_name):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " DROP COLUMN " + column_name
+        try:
+            self.db1.execute(command)
+        except Exception as e:
+            print("Cant drop " + self.name)
+
+    @save_migration
+    def modify_column(self, column_name, new_column_type):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " ALTER COLUMN " + column_name + " TYPE " + new_column_type
+        self.db1.execute(command)
+
 class MongoTable():
     def __init__(self, db, name, columns = [], types = []):
         self.name = name
