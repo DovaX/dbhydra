@@ -222,12 +222,12 @@ class db(AbstractDB):
         
 class Mysqldb(AbstractDB):           
     def connect_locally(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
     def connect_remotely(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
