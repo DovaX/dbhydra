@@ -1,12 +1,30 @@
 import dbhydra_core as dh
+import pandas as pd
+import pymongo
 
 
-db1=dh.Mysqldb("config-mysql.ini")
 
 db2 = dh.PostgresDb("config-mongo.ini")
+migrator = dh.Migrator()
 
+csv_file =  open("../examples/example.csv")
+name = csv_file.name.split('/')[-1].split('.')[0]
+
+df = pd.read_csv(csv_file)
+df = df.rename(columns={'Unnamed: 0' : 'id'})
+columns, types = migrator.create_migrations_from_df(name,df)
+exit()
 db2.initialize_migrator()
-db1.initialize_migrator()
+
+
+
+
+
+print(df)
+
+#t = dh.PostgresTable(db2, "example", columns, types)
+#t.create()
+exit()
 '''
 
 

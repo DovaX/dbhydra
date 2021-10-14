@@ -74,7 +74,7 @@ def save_migration(function, *args, **kw): #decorator
 
 
 class Migrator:
-    def __init__(self,db):
+    def __init__(self,db = None):
         self.db=db
         self.migration_number=1
         self.migration_list=[]
@@ -147,8 +147,27 @@ class Migrator:
 
         with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
             f.write(result)
+    def create_migrations_from_df(self,name, dataframe):
+        columns = list(dataframe.columns)
 
+        return_types = []
+        for col in dataframe:
+            t = dataframe.loc[0, col]
+            try:
+                return_types.append(type(t.item()).__name__)
+            except:
+                length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
+                return_types.append('nvarchar(' + str(length) + ')' if  type(t).__name__ == 'str' else type(t).__name__)
 
+        #return_types = ['nvarchar(255)' if type == 'str' else type for type in return_types]
+        print(return_types)
+        if (columns[0] != "id"):
+            columns.insert(0, "id")
+            return_types.insert(0, "int")
+        migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
+        self.migration_list.append(migration_dict)
+        self.migration_list_to_json()
+        return columns, return_types
 
 
 
