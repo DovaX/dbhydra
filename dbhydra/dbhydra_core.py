@@ -66,12 +66,12 @@ def save_migration(function, *args, **kw): #decorator
         migrator=instance.db1.migrator
         migrator.migration_list.append(migration_dict)
         migrator.migration_list_to_json()
-
-
+            
+        
         function(instance,*args,**kw)
     return(new_function)
 
-
+        
 
 class Migrator:
     def __init__(self,db = None):
@@ -87,7 +87,6 @@ class Migrator:
         print("operation")
         print(operation)
         options=migration_dict[operation]
-        print(options)
         if operation=="create":
             if (isinstance(self.db, Mysqldb)):
                 table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
@@ -118,17 +117,17 @@ class Migrator:
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"])
             table.drop_column(options["column_name"])
-
+            
     def next_migration(self):
         self.migration_number+=1
         self.migration_list=[]
-
-
+            
+      
     def migrate(self,migration_list):
         for i,migration_dict in enumerate(migration_list):
             self.process_migration_dict(migration_dict)
-
-
+           
+            
     def migrate_from_json(self,filename):
         with open(filename,"r") as f:
             rows=f.readlines()[0].replace("\n","")
@@ -140,11 +139,11 @@ class Migrator:
             print(dict)
             self.process_migration_dict(dict)
         return(result)
-
-
+        
+        
     def migration_list_to_json(self):
         result=json.dumps(self.migration_list)
-
+        
         with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
             f.write(result)
     def create_migrations_from_df(self,name, dataframe):
@@ -229,6 +228,9 @@ class AbstractDBPostgres:
         print("DB connection closed")
     def initialize_migrator(self):
         self.migrator=Migrator(self)
+
+        
+
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
@@ -308,7 +310,7 @@ class db(AbstractDB):
         
 class Mysqldb(AbstractDB):           
     def connect_locally(self):
-        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,db=self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -360,9 +362,6 @@ class PostgresDb(AbstractDBPostgres):
 
         return(table_dict)
 
-
-
-
 class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
         #self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
@@ -401,7 +400,6 @@ class AbstractSelectable:
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         self.db1.cursor.execute(query)
-        print(query)
         column_string=query.lower().split("from")[0]
         if "*" in column_string:
             columns=len(self.columns)
@@ -488,6 +486,10 @@ class AbstractTable(AbstractJoinable):
             df.loc[pd.isna(df[column]), column] = "NULL"
         
         rows=df.values.tolist()
+        for i,row in enumerate(rows):
+            for j,record in enumerate(row):
+                if type(record)==str:
+                    rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode)
 
 class PostgresTable(AbstractTable):
@@ -786,7 +788,7 @@ class Table(Joinable,AbstractTable):
                     print("Warning: IndexError for foreign key self.columns[fk[parent_column_id]]:",e)
         return(parent_foreign_keys)
 
-
+             
        
 class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
@@ -910,7 +912,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
         self.db1.execute(command)
 
-
+        
 
 
 class XlsxDB:
