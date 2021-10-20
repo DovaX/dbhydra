@@ -368,6 +368,10 @@ class AbstractTable(AbstractJoinable):
             df.loc[pd.isna(df[column]), column] = "NULL"
         
         rows=df.values.tolist()
+        for i,row in enumerate(rows):
+            for j,record in enumerate(row):
+                if type(record)==str:
+                    rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode)
 
 class MongoTable():
@@ -405,6 +409,9 @@ class MongoTable():
         return self.collection.update(query, newvalues)
     def insertFromDataFrame(self, dataframe):
         return self.collection.insert_many(dataframe.to_dict)
+    
+    
+    
 class Table(Joinable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         """Override joinable init"""
