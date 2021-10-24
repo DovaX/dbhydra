@@ -315,7 +315,7 @@ class Mysqldb(AbstractDB):
         print("DB connection established")
         
     def connect_remotely(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -377,7 +377,7 @@ class MongoDb(AbstractDBMongo):
 
     def get_all_tables(self):
         return self.database.list_collection_names()
-    def createTable(self, name):
+    def createTable(self, name) :
         return self.database[name]
     def close_connection(self):
         self.connection.close()
@@ -496,18 +496,17 @@ class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns = None, types = None):
         super().__init__(db1,name,columns)
         print("==========================================")
-
-        self.columns= columns
-        self.types = types
     def get_all_columns(self):
-
-        return self.db1.execute("SELECT column_name FROM	"
-                        "INFORMATION_SCHEMA.COLUMNS "
-                        "WHERE	table_name = '{}';".format(self.name))
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        columns = information_schema_table.select(query)
+        print(columns)
+        return (columns)
     def get_all_types(self):
         information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
         query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
         types=information_schema_table.select(query)
+        print(types)
         return(types)
     def select_all(self):
         print(super().select_all())
@@ -541,7 +540,13 @@ class PostgresTable(AbstractTable):
     def add_column(self, column_name, column_type):
         assert len(column_name) > 1
         command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
-        self.db1.execute(command)
+        try:
+            self.db1.execute(command)
+            self.columns.append(column_name)
+            self.types.append(column_type)
+        except Exception as e:
+            print(e)
+            print("Cant add column to table.")
 
     @save_migration
     def drop_column(self, column_name):
@@ -549,14 +554,23 @@ class PostgresTable(AbstractTable):
         command = "ALTER TABLE " + self.name + " DROP COLUMN " + column_name
         try:
             self.db1.execute(command)
+            index = self.db1.columns.index(column_name)
+            self.db1.columns.remove(column_name)
+            self.db1.types.remove(self.db1.types[index])
         except Exception as e:
+            print(e)
             print("Cant drop " + self.name)
 
     @save_migration
     def modify_column(self, column_name, new_column_type):
         assert len(column_name) > 1
         command = "ALTER TABLE " + self.name + " ALTER COLUMN " + column_name + " TYPE " + new_column_type
-        self.db1.execute(command)
+        try:
+            self.db1.execute(command)
+            index = self.columns.index(column_name)
+            self.types[index] = new_column_type
+        except Exception as e:
+            print("Cant add column to table.")
 
 class MongoTable():
     def __init__(self, db, name, columns = [], types = []):
@@ -837,6 +851,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
         
         assert len(self.columns)==len(self.types)
+        print(self.types)
         for k in range(len(rows)):
             if k%batch==0:
                 query="INSERT INTO "+self.name+" ("
@@ -894,23 +909,39 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         self.db1.execute(query)
 
     @save_migration
-    def add_column(self,column_name,column_type):
+    def add_column(self, column_name, column_type):
         assert len(column_name) > 1
-        command="ALTER TABLE "+self.name+" ADD COLUMN "+column_name+" "+column_type
-        self.db1.execute(command)
+        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        try:
+            self.db1.execute(command)
+            self.columns.append(column_name)
+            self.types.append(column_type)
+        except Exception as e:
+            print("Cant add column to table.")
     @save_migration
     def drop_column(self,column_name):
         assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" DROP COLUMN "+column_name
         try:
+            print(command)
             self.db1.execute(command)
+            index = self.db1.columns.index(column_name)
+            self.db1.columns.remove(column_name)
+            self.db1.types.remove(self.db1.types[index])
         except Exception as e:
+            print(e)
             print("Cant drop "+self.name)
     @save_migration
     def modify_column(self,column_name,new_column_type):
         assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
+        print(command)
+
         self.db1.execute(command)
+        index = self.columns.index(column_name)
+        self.types[index] = new_column_type
+
+        print("Cant add column to table.")
 
         
 
