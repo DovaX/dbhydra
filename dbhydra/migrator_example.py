@@ -18,9 +18,15 @@ columns, types = migrator.create_migrations_from_df(name,df)
 exit()
 '''
 db2.initialize_migrator()
+table2=dh.MysqlTable(db2,"test_table3")
+print(table2.initialize_columns())
+exit()
+table2=dh.MysqlTable(db2,"test_table5",["id","test1"],["int","integer"])
+table2.create()
+print(db2.generate_table_dict())
 
-
-
+print(db2.generate_table_dict()["test_table5"].get_all_columns())
+exit()
 
 
 

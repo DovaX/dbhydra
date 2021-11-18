@@ -82,13 +82,11 @@ class Migrator:
     def process_migration_dict(self,migration_dict):
         assert len(migration_dict.keys())==1
         operation=list(migration_dict.keys())[0]
-        print(type(self.db))
-
-        print("operation")
-        print(operation)
+        tables = {}
         options=migration_dict[operation]
         if operation=="create":
             if (isinstance(self.db, Mysqldb)):
+
                 table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db,options["table_name"],options["columns"],options["types"])
@@ -104,18 +102,24 @@ class Migrator:
                 table=MysqlTable(self.db,options["table_name"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
             table.add_column(options["column_name"],options["column_type"])
         elif operation=="modify_column":
             if (isinstance(self.db, Mysqldb)):
                 table=MysqlTable(self.db,options["table_name"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
             table.modify_column(options["column_name"],options["column_type"])
         elif operation=="drop_column":
             if (isinstance(self.db, Mysqldb)):
                 table=MysqlTable(self.db,options["table_name"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
             table.drop_column(options["column_name"])
             
     def next_migration(self):
@@ -131,12 +135,8 @@ class Migrator:
     def migrate_from_json(self,filename):
         with open(filename,"r") as f:
             rows=f.readlines()[0].replace("\n","")
-            print(rows)
         result=json.loads(rows)
-        print(len(result))
         for dict in result:
-            print(type(dict))
-            print(dict)
             self.process_migration_dict(dict)
         return(result)
         
@@ -399,6 +399,7 @@ class AbstractSelectable:
     def select(self,query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
+        print(query)
         self.db1.cursor.execute(query)
         column_string=query.lower().split("from")[0]
         if "*" in column_string:
@@ -408,6 +409,7 @@ class AbstractSelectable:
         else:
             columns = len(column_string.split(","))
         rows = self.db1.cursor.fetchall()
+        print(rows)
         if columns==1:
             cleared_rows_list = [item[0] for item in rows]
         
@@ -495,6 +497,7 @@ class AbstractTable(AbstractJoinable):
 class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns = None, types = None):
         super().__init__(db1,name,columns)
+        self.types = types
         print("==========================================")
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
@@ -809,11 +812,21 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         super().__init__(db1,name,columns)
         self.types=types
      
-        
+    def initialize_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        columns = information_schema_table.select(query)
+        self.columns = columns
+    def initialize_types(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        types = information_schema_table.select(query)
+        self.types = types
     def get_all_columns(self):
         information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS')
         query="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
         columns=information_schema_table.select(query)
+
         return(columns)
 
     def get_all_types(self):
@@ -936,12 +949,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         assert len(column_name) > 1
         command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
         print(command)
-
-        self.db1.execute(command)
-        index = self.columns.index(column_name)
-        self.types[index] = new_column_type
-
-        print("Cant add column to table.")
+        try:
+            self.db1.execute(command)
+            index = self.columns.index(column_name)
+            self.types[index] = new_column_type
+        except:
+            print("Cant modify column to table.")
 
         
 
