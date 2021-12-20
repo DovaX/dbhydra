@@ -592,7 +592,13 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             query+="("
             for j in range(len(rows[k])):
                 if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
-                    query+="NULL,"
+                    
+                    if "int" in self.types[j+1]:
+                        if replace_apostrophes:
+                            rows[k][j]=str(rows[k][j]).replace("'","")
+                        query+="NULL"
+                    else:
+                        query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
                     if replace_apostrophes:
                         rows[k][j]=str(rows[k][j]).replace("'","")
@@ -603,10 +609,14 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     query+="'"+str(rows[k][j])+"',"
                 elif self.types[j+1]=="int":
                     query+=str(rows[k][j])+","
+                elif "datetime" in self.types[j+1]:
+                    if replace_apostrophes:
+                        rows[k][j]=str(rows[k][j]).replace("'","")
+                    query+="'"+str(rows[k][j])+"',"
                 elif "date" in self.types[j+1]:
                     query+="'"+str(rows[k][j])+"',"
-                elif "datetime" in self.types[j+1]:
-                    query+="'"+str(rows[k][j])+"',"
+                
+                
                 else:
                     query+=str(rows[k][j])+","
 
