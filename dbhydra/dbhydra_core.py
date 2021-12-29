@@ -373,6 +373,14 @@ class AbstractTable(AbstractJoinable):
                 if type(record)==str:
                     rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode)
+        
+    def delete(self,where=None):
+        if where is None:
+            query = "DELETE FROM "+self.name
+        else:
+            query = "DELETE FROM "+self.name+" WHERE "+where
+        print(query)
+        self.db1.execute(query)
 
 class MongoTable():
     def __init__(self, db, name):
@@ -503,13 +511,7 @@ class Table(Joinable,AbstractTable):
                         file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
                         file.close()
                             
-    def delete(self,where=None):
-        if where is None:
-            query = "DELETE FROM "+self.name
-        else:
-            query = "DELETE FROM "+self.name+" WHERE "+where
-        print(query)
-        self.db1.execute(query)
+    
         
         
     
@@ -558,7 +560,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
-    @save_migration
+    #@save_migration #TODO: Uncomment
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
         assert self.columns[0]=="id"
@@ -577,7 +579,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             print("Check the specification of table columns and their types")
                             
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
-        
+        print("INSERTING!!!")
         assert len(self.columns)==len(self.types)
         for k in range(len(rows)):
             if k%batch==0:
