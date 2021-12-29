@@ -29,6 +29,148 @@ def read_connection_details(config_file):
     print(", ".join([db_details['DB_SERVER'],db_details['DB_DATABASE'],db_details['DB_USERNAME']]))
     return(db_details)
 
+
+
+import json
+
+
+
+
+
+def save_migration(function, *args, **kw): #decorator
+    def new_function(instance, *args, **kw):
+        print("TOTO TU")
+        print(instance)
+        print(*args)
+        command=function.__name__
+        if command=="create":
+            migration_dict={"create":{"table_name":instance.name,"columns":instance.columns,"types":instance.types}}
+            print(migration_dict)
+        if command=="drop":
+            migration_dict={"drop":{"table_name":instance.name}}
+            print(migration_dict)
+        if command=="add_column":
+            migration_dict = {
+                "add_column": {"table_name": instance.name, "column_name": args[0], "column_type": args[1]}}
+            print(migration_dict)
+        if command == "drop_column":
+            migration_dict = {
+                "drop_column": {"table_name": instance.name, "column_name": args[0]}}
+            print(migration_dict)
+        if command == "modify_column":
+            migration_dict = {
+                "modify_column": {"table_name": instance.name, "column_name": args[0], "column_type": args[1]}}
+            print(migration_dict)
+        #TODO: add other methods
+
+        migrator=instance.db1.migrator
+        migrator.migration_list.append(migration_dict)
+        migrator.migration_list_to_json()
+            
+        
+        function(instance,*args,**kw)
+    return(new_function)
+
+        
+
+class Migrator:
+    def __init__(self,db = None):
+        self.db=db
+        self.migration_number=1
+        self.migration_list=[]
+
+    def process_migration_dict(self,migration_dict):
+        assert len(migration_dict.keys())==1
+        operation=list(migration_dict.keys())[0]
+        tables = {}
+        options=migration_dict[operation]
+        if operation=="create":
+            if (isinstance(self.db, Mysqldb)):
+
+                table=MysqlTable(self.db,options["table_name"],options["columns"],options["types"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db,options["table_name"],options["columns"],options["types"])
+            table.create()
+        elif operation=="drop":
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
+            table.drop()
+        elif operation=="add_column":
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
+            table.add_column(options["column_name"],options["column_type"])
+        elif operation=="modify_column":
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
+            table.modify_column(options["column_name"],options["column_type"])
+        elif operation=="drop_column":
+            if (isinstance(self.db, Mysqldb)):
+                table=MysqlTable(self.db,options["table_name"])
+            elif (isinstance(self.db, PostgresDb)):
+                table = PostgresTable(self.db, options["table_name"])
+            table.initialize_columns()
+            table.initialize_types()
+            table.drop_column(options["column_name"])
+            
+    def next_migration(self):
+        self.migration_number+=1
+        self.migration_list=[]
+            
+      
+    def migrate(self,migration_list):
+        for i,migration_dict in enumerate(migration_list):
+            self.process_migration_dict(migration_dict)
+           
+            
+    def migrate_from_json(self,filename):
+        with open(filename,"r") as f:
+            rows=f.readlines()[0].replace("\n","")
+        result=json.loads(rows)
+        for dict in result:
+            self.process_migration_dict(dict)
+        return(result)
+        
+        
+    def migration_list_to_json(self):
+        result=json.dumps(self.migration_list)
+        
+        with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
+            f.write(result)
+    def create_migrations_from_df(self,name, dataframe):
+        columns = list(dataframe.columns)
+
+        return_types = []
+        for col in dataframe:
+            t = dataframe.loc[0, col]
+            try:
+                return_types.append(type(t.item()).__name__)
+            except:
+                length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
+                return_types.append('nvarchar(' + str(length) + ')' if  type(t).__name__ == 'str' else type(t).__name__)
+
+        #return_types = ['nvarchar(255)' if type == 'str' else type for type in return_types]
+        print(return_types)
+        if (columns[0] != "id"):
+            columns.insert(0, "id")
+            return_types.insert(0, "int")
+        migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
+        self.migration_list.append(migration_dict)
+        self.migration_list_to_json()
+        return columns, return_types
+
+
+
+
 class AbstractDB:
     def __init__(self,config_file="config.ini",db_details=None):
         if db_details is None:    
@@ -60,6 +202,9 @@ class AbstractDB:
         self.connection.close()
         print("DB connection closed")  
 
+    def initialize_migrator(self):
+        self.migrator=Migrator(self)
+
 class AbstractDBPostgres:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
@@ -67,6 +212,7 @@ class AbstractDBPostgres:
         locally = True
         if db_details["LOCALLY"] == "False":
             locally = False
+
 
         self.DB_SERVER = db_details["DB_SERVER"]
         self.DB_DATABASE = db_details["DB_DATABASE"]
@@ -80,6 +226,11 @@ class AbstractDBPostgres:
     def close_connection(self):
         self.cursor.close()
         print("DB connection closed")
+    def initialize_migrator(self):
+        self.migrator=Migrator(self)
+
+        
+
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
         if db_details is None:
@@ -97,6 +248,7 @@ class AbstractDBMongo:
         else:
             self.connect_remotely()
 
+        #TODO, execute, close
 class db(AbstractDB):
     def connect_remotely(self):
         
@@ -158,12 +310,12 @@ class db(AbstractDB):
         
 class Mysqldb(AbstractDB):           
     def connect_locally(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
     def connect_remotely(self):
-        self.connection = MySQLdb.connect(self.DB_SERVER,self.DB_USERNAME,self.DB_PASSWORD,self.DB_DATABASE)
+        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -192,11 +344,12 @@ class PostgresDb(AbstractDBPostgres):
     database=self.DB_DATABASE,
     user=self.DB_USERNAME,
     password=self.DB_PASSWORD)
+        self.connection.autocommit = True
         self.cursor = self.connection.cursor()
     def execute(self, query):
-
         self.cursor.execute(query)
-        return  [''.join(i) for i in self.cursor.fetchall()]
+
+        #return  [''.join(i) for i in self.cursor.fetchall()]
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
@@ -224,7 +377,7 @@ class MongoDb(AbstractDBMongo):
 
     def get_all_tables(self):
         return self.database.list_collection_names()
-    def createTable(self, name):
+    def createTable(self, name) :
         return self.database[name]
     def close_connection(self):
         self.connection.close()
@@ -246,8 +399,8 @@ class AbstractSelectable:
     def select(self,query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        self.db1.cursor.execute(query)
         print(query)
+        self.db1.cursor.execute(query)
         column_string=query.lower().split("from")[0]
         if "*" in column_string:
             columns=len(self.columns)
@@ -256,7 +409,7 @@ class AbstractSelectable:
         else:
             columns = len(column_string.split(","))
         rows = self.db1.cursor.fetchall()
-
+        print(rows)
         if columns==1:
             cleared_rows_list = [item[0] for item in rows]
         
@@ -269,7 +422,7 @@ class AbstractSelectable:
                     list1.append(row[i])
                 cleared_rows_list.append(list1)  
         return(cleared_rows_list)
-
+     
     def select_all(self):
         list1=self.select("SELECT * FROM "+self.name)
         return(list1)
@@ -313,7 +466,7 @@ class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-
+    @save_migration
     def drop(self):
         query="DROP TABLE "+self.name
         print(query)
@@ -335,24 +488,28 @@ class AbstractTable(AbstractJoinable):
             df.loc[pd.isna(df[column]), column] = "NULL"
         
         rows=df.values.tolist()
+        for i,row in enumerate(rows):
+            for j,record in enumerate(row):
+                if type(record)==str:
+                    rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode)
 
 class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns = None, types = None):
         super().__init__(db1,name,columns)
-        print("==========================================")
-
-        self.columns= self.get_all_columns()
         self.types = types
+        print("==========================================")
     def get_all_columns(self):
-
-        return self.db1.execute("SELECT column_name FROM	"
-                        "INFORMATION_SCHEMA.COLUMNS "
-                        "WHERE	table_name = '{}';".format(self.name))
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        columns = information_schema_table.select(query)
+        print(columns)
+        return (columns)
     def get_all_types(self):
         information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
         query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
         types=information_schema_table.select(query)
+        print(types)
         return(types)
     def select_all(self):
         print(super().select_all())
@@ -363,6 +520,61 @@ class PostgresTable(AbstractTable):
         columns=temporary_table.get_all_columns()
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
+
+    @save_migration
+    def create(self, foreign_keys=None):
+        assert len(self.columns) == len(self.types)
+        assert self.columns[0] == "id"
+        assert self.types[0] == "int"
+        query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
+        for i in range(1, len(self.columns)):
+            query += self.columns[i] + " " + self.types[i] + ","
+
+        query = query[:-1]
+        query += ")"
+        print(query)
+        try:
+            self.db1.cursor.execute(query)
+        except Exception as e:
+            print("Table " + self.name + " already exists:", e)
+            print("Check the specification of table columns and their types")
+
+    @save_migration
+    def add_column(self, column_name, column_type):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        try:
+            self.db1.execute(command)
+            self.columns.append(column_name)
+            self.types.append(column_type)
+        except Exception as e:
+            print(e)
+            print("Cant add column to table.")
+
+    @save_migration
+    def drop_column(self, column_name):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " DROP COLUMN " + column_name
+        try:
+            self.db1.execute(command)
+            index = self.db1.columns.index(column_name)
+            self.db1.columns.remove(column_name)
+            self.db1.types.remove(self.db1.types[index])
+        except Exception as e:
+            print(e)
+            print("Cant drop " + self.name)
+
+    @save_migration
+    def modify_column(self, column_name, new_column_type):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " ALTER COLUMN " + column_name + " TYPE " + new_column_type
+        try:
+            self.db1.execute(command)
+            index = self.columns.index(column_name)
+            self.types[index] = new_column_type
+        except Exception as e:
+            print("Cant add column to table.")
+
 class MongoTable():
     def __init__(self, db, name, columns = [], types = []):
         self.name = name
@@ -371,8 +583,6 @@ class MongoTable():
         print(type(db))
         print(db)
         self.collection = self.db.createTable(name)
-        self.columns=columns
-        self.types = types
     def drop(self):
         return self.collection.drop()
     def insert(self, document):
@@ -594,19 +804,29 @@ class Table(Joinable,AbstractTable):
                 except IndexError as e:
                     print("Warning: IndexError for foreign key self.columns[fk[parent_column_id]]:",e)
         return(parent_foreign_keys)
-    
-                
+
+             
        
 class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
      
-        
+    def initialize_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        columns = information_schema_table.select(query)
+        self.columns = columns
+    def initialize_types(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        types = information_schema_table.select(query)
+        self.types = types
     def get_all_columns(self):
         information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS')
         query="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
         columns=information_schema_table.select(query)
+
         return(columns)
 
     def get_all_types(self):
@@ -623,7 +843,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
-        
+    @save_migration
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
         assert self.columns[0]=="id"
@@ -644,6 +864,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
         
         assert len(self.columns)==len(self.types)
+        print(self.types)
         for k in range(len(rows)):
             if k%batch==0:
                 query="INSERT INTO "+self.name+" ("
@@ -699,6 +920,43 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         query="ALTER TABLE "+self.name+" ADD FOREIGN KEY ("+parent_id+") REFERENCES "+parent+"(id)"
         print(query)
         self.db1.execute(query)
+
+    @save_migration
+    def add_column(self, column_name, column_type):
+        assert len(column_name) > 1
+        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        try:
+            self.db1.execute(command)
+            self.columns.append(column_name)
+            self.types.append(column_type)
+        except Exception as e:
+            print("Cant add column to table.")
+    @save_migration
+    def drop_column(self,column_name):
+        assert len(column_name) > 1
+        command="ALTER TABLE "+self.name+" DROP COLUMN "+column_name
+        try:
+            print(command)
+            self.db1.execute(command)
+            index = self.db1.columns.index(column_name)
+            self.db1.columns.remove(column_name)
+            self.db1.types.remove(self.db1.types[index])
+        except Exception as e:
+            print(e)
+            print("Cant drop "+self.name)
+    @save_migration
+    def modify_column(self,column_name,new_column_type):
+        assert len(column_name) > 1
+        command="ALTER TABLE "+self.name+" MODIFY COLUMN "+column_name+" "+new_column_type
+        print(command)
+        try:
+            self.db1.execute(command)
+            index = self.columns.index(column_name)
+            self.types[index] = new_column_type
+        except:
+            print("Cant modify column to table.")
+
+        
 
 
 class XlsxDB:
