@@ -493,6 +493,14 @@ class AbstractTable(AbstractJoinable):
                 if type(record)==str:
                     rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode)
+        
+    def delete(self,where=None):
+        if where is None:
+            query = "DELETE FROM "+self.name
+        else:
+            query = "DELETE FROM "+self.name+" WHERE "+where
+        print(query)
+        self.db1.execute(query)
 
 class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns = None, types = None):
@@ -778,13 +786,7 @@ class Table(Joinable,AbstractTable):
                         file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
                         file.close()
                             
-    def delete(self,where=None):
-        if where is None:
-            query = "DELETE FROM "+self.name
-        else:
-            query = "DELETE FROM "+self.name+" WHERE "+where
-        print(query)
-        self.db1.execute(query)
+    
         
         
     
@@ -843,7 +845,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
-    @save_migration
+    #@save_migration #TODO: Uncomment
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
         assert self.columns[0]=="id"
@@ -862,7 +864,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             print("Check the specification of table columns and their types")
                             
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
-        
+        print("INSERTING!!!")
         assert len(self.columns)==len(self.types)
         print(self.types)
         for k in range(len(rows)):
@@ -878,7 +880,13 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             query+="("
             for j in range(len(rows[k])):
                 if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
-                    query+="NULL,"
+                    
+                    if "int" in self.types[j+1]:
+                        if replace_apostrophes:
+                            rows[k][j]=str(rows[k][j]).replace("'","")
+                        query+="NULL"
+                    else:
+                        query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
                     if replace_apostrophes:
                         rows[k][j]=str(rows[k][j]).replace("'","")
@@ -889,10 +897,14 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     query+="'"+str(rows[k][j])+"',"
                 elif self.types[j+1]=="int":
                     query+=str(rows[k][j])+","
+                elif "datetime" in self.types[j+1]:
+                    if replace_apostrophes:
+                        rows[k][j]=str(rows[k][j]).replace("'","")
+                    query+="'"+str(rows[k][j])+"',"
                 elif "date" in self.types[j+1]:
                     query+="'"+str(rows[k][j])+"',"
-                elif "datetime" in self.types[j+1]:
-                    query+="'"+str(rows[k][j])+"',"
+                
+                
                 else:
                     query+=str(rows[k][j])+","
 
