@@ -49,7 +49,9 @@ table2 = dh.Table(db1,"test_new",["id","test2"],["int","nvarchar(20)"])
 ```
 ## Current scope
 Aims: Easy integration with Pandas, SQL SERVER/MySQL database, and exports/imports to/from excel/CSV format
+
 Done: Table functions (Create, Drop, Select, Update, Insert, and Delete) should be working fine
+
 Todo: Group by, Order by, Where, Linking of FK, Customizable PK,...
 
 
