@@ -171,7 +171,7 @@ class Migrator:
                 length = int(math.ceil(length/10.0))*10
                 return_types.append(f'nvarchar({length})' if  type(t).__name__ == 'str' else type(t).__name__)
 
-        if (lower(columns[0]) != "id"):
+        if (columns[0] != "id"):
             columns.insert(0, "id")
             return_types.insert(0, "int")
 
