@@ -9,6 +9,7 @@ import psycopg2
 from psycopg2 import sql
 #import MySQLdb
 import pickle
+import math
 
 def read_file(file):
     """Reads txt file -> list"""
@@ -144,31 +145,37 @@ class Migrator:
     def migration_list_to_json(self):
         result=json.dumps(self.migration_list)
         
-        with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
+        with open("migrations/migration-"+str(self.migration_number)+".json","w+") as f:
             f.write(result)
     def create_migrations_from_df(self,name, dataframe):
-        columns = list(dataframe.columns)
+        
+        columns, return_types = self.extract_columns_and_types_from_df(dataframe)
 
-        return_types = []
-        for col in dataframe:
-            t = dataframe.loc[0, col]
-            try:
-                return_types.append(type(t.item()).__name__)
-            except:
-                length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
-                return_types.append('nvarchar(' + str(length) + ')' if  type(t).__name__ == 'str' else type(t).__name__)
-
-        #return_types = ['nvarchar(255)' if type == 'str' else type for type in return_types]
-        print(return_types)
-        if (columns[0] != "id"):
-            columns.insert(0, "id")
-            return_types.insert(0, "int")
         migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
         self.migration_list.append(migration_dict)
         self.migration_list_to_json()
+        #return columns, return_types
+
+    def extract_columns_and_types_from_df(self, dataframe):
+        columns = list(dataframe.columns)
+
+        return_types = []
+        for column in dataframe:
+            t = dataframe.loc[0, column]
+            try:
+                return_types.append(type(t.item()).__name__)
+            except:
+                #length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
+                length = int(dataframe[column].str.len().max())
+                length += 0.1*length
+                length = int(math.ceil(length/10.0))*10
+                return_types.append(f'nvarchar({length})' if  type(t).__name__ == 'str' else type(t).__name__)
+
+        if (lower(columns[0]) != "id"):
+            columns.insert(0, "id")
+            return_types.insert(0, "int")
+
         return columns, return_types
-
-
 
 
 class AbstractDB:
