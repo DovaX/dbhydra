@@ -677,6 +677,7 @@ class MongoTable():
             self.print_nested_keys(dict_j,  columns, types )
         types = self.get_all_types(types)
         return columns, types
+    
     def get_all_types(self, types):
         print(types)
         types_list = []
@@ -752,7 +753,7 @@ class Table(Joinable,AbstractTable):
             
             query+="("
             for j in range(len(rows[k])):
-                if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
+                if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
                     query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
                     if replace_apostrophes:
@@ -879,7 +880,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             
             query+="("
             for j in range(len(rows[k])):
-                if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
+                if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
                     
                     if "int" in self.types[j+1]:
                         if replace_apostrophes:
