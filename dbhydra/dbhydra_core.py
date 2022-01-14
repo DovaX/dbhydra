@@ -11,6 +11,8 @@ from psycopg2 import sql
 import pickle
 import math
 
+import abc
+
 def read_file(file):
     """Reads txt file -> list"""
 
@@ -142,11 +144,16 @@ class Migrator:
         return(result)
         
         
-    def migration_list_to_json(self):
+    def migration_list_to_json(self, filename = None):
         result=json.dumps(self.migration_list)
         
-        with open("migrations/migration-"+str(self.migration_number)+".json","w+") as f:
-            f.write(result)
+        if filename is None or filename == "" or filename.isspace():
+            with open("migrations/migration-"+str(self.migration_number)+".json","w+") as f:
+                f.write(result)
+        else:
+            with open(f"{filename}.json","w+") as f:
+                f.write(result)
+
     def create_migrations_from_df(self,name, dataframe):
         
         columns, return_types = self.extract_columns_and_types_from_df(dataframe)
@@ -178,13 +185,13 @@ class Migrator:
         return columns, return_types
 
 
-class AbstractDB:
+class AbstractDB(abc.ABC):
     def __init__(self,config_file="config.ini",db_details=None):
         if db_details is None:    
             db_details=read_connection_details(config_file)
-        locally=True
+        self.locally=True
         if db_details["LOCALLY"]=="False":
-            locally=False
+            self.locally=False
 
         self.DB_SERVER=db_details["DB_SERVER"]
         self.DB_DATABASE=db_details["DB_DATABASE"]
@@ -195,8 +202,17 @@ class AbstractDB:
             self.DB_DRIVER = db_details["DB_DRIVER"]
         else:
             self.DB_DRIVER="ODBC Driver 13 for SQL Server"
-        
-        if locally:
+    
+    @abc.abstractmethod
+    def connect_locally(self):
+        pass
+
+    @abc.abstractmethod
+    def connect_remotely(self):
+        pass    
+
+    def connect(self):
+        if self.locally:
             self.connect_locally()
         else:
             self.connect_remotely()
