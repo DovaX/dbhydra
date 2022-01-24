@@ -183,6 +183,10 @@ class AbstractDB:
         self.DB_DATABASE=db_details["DB_DATABASE"]
         self.DB_USERNAME = db_details["DB_USERNAME"]
         self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if "DB_PORT" in db_details.keys():
+            self.DB_PORT = int(db_details["DB_PORT"])
+        else:
+            self.DB_PORT = None
         
         if "DB_DRIVER" in db_details.keys():
             self.DB_DRIVER = db_details["DB_DRIVER"]
@@ -315,7 +319,10 @@ class Mysqldb(AbstractDB):
         print("DB connection established")
         
     def connect_remotely(self):
-        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
+        if self.DB_PORT is not None:
+            self.connection = MySQLdb.connect(host=self.DB_SERVER,port=self.DB_PORT,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
+        else:    
+            self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -466,7 +473,8 @@ class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-    @save_migration
+    
+    #@save_migration
     def drop(self):
         query="DROP TABLE "+self.name
         print(query)
@@ -846,6 +854,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
+    
+    def drop(self):
+        query="DROP TABLE "+self.name+";"
+        print(query)
+        self.db1.execute(query)
+    
     #@save_migration #TODO: Uncomment
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
@@ -885,7 +899,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     if "int" in self.types[j+1]:
                         if replace_apostrophes:
                             rows[k][j]=str(rows[k][j]).replace("'","")
-                        query+="NULL"
+                        query+="NULL,"
                     else:
                         query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
