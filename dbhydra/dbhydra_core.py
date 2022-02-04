@@ -9,6 +9,9 @@ import psycopg2
 from psycopg2 import sql
 #import MySQLdb
 import pickle
+import math
+
+import abc
 
 def read_file(file):
     """Reads txt file -> list"""
@@ -141,43 +144,54 @@ class Migrator:
         return(result)
         
         
-    def migration_list_to_json(self):
+    def migration_list_to_json(self, filename = None):
         result=json.dumps(self.migration_list)
         
-        with open("migrations//migration-"+str(self.migration_number)+".json","w+") as f:
-            f.write(result)
+        if filename is None or filename == "" or filename.isspace():
+            with open("migrations/migration-"+str(self.migration_number)+".json","w+") as f:
+                f.write(result)
+        else:
+            with open(f"{filename}.json","w+") as f:
+                f.write(result)
+
     def create_migrations_from_df(self,name, dataframe):
-        columns = list(dataframe.columns)
+        
+        columns, return_types = self.extract_columns_and_types_from_df(dataframe)
 
-        return_types = []
-        for col in dataframe:
-            t = dataframe.loc[0, col]
-            try:
-                return_types.append(type(t.item()).__name__)
-            except:
-                length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
-                return_types.append('nvarchar(' + str(length) + ')' if  type(t).__name__ == 'str' else type(t).__name__)
-
-        #return_types = ['nvarchar(255)' if type == 'str' else type for type in return_types]
-        print(return_types)
-        if (columns[0] != "id"):
-            columns.insert(0, "id")
-            return_types.insert(0, "int")
         migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
         self.migration_list.append(migration_dict)
         self.migration_list_to_json()
+        #return columns, return_types
+
+    def extract_columns_and_types_from_df(self, dataframe):
+        columns = list(dataframe.columns)
+
+        return_types = []
+        for column in dataframe:
+            t = dataframe.loc[0, column]
+            try:
+                return_types.append(type(t.item()).__name__)
+            except:
+                #length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
+                length = int(dataframe[column].str.len().max())
+                length += 0.1*length
+                length = int(math.ceil(length/10.0))*10
+                return_types.append(f'nvarchar({length})' if  type(t).__name__ == 'str' else type(t).__name__)
+
+        if (columns[0] != "id"):
+            columns.insert(0, "id")
+            return_types.insert(0, "int")
+
         return columns, return_types
 
 
-
-
-class AbstractDB:
+class AbstractDB(abc.ABC):
     def __init__(self,config_file="config.ini",db_details=None):
         if db_details is None:    
             db_details=read_connection_details(config_file)
-        locally=True
+        self.locally=True
         if db_details["LOCALLY"]=="False":
-            locally=False
+            self.locally=False
 
         self.DB_SERVER=db_details["DB_SERVER"]
         self.DB_DATABASE=db_details["DB_DATABASE"]
@@ -188,8 +202,17 @@ class AbstractDB:
             self.DB_DRIVER = db_details["DB_DRIVER"]
         else:
             self.DB_DRIVER="ODBC Driver 13 for SQL Server"
-        
-        if locally:
+    
+    @abc.abstractmethod
+    def connect_locally(self):
+        pass
+
+    @abc.abstractmethod
+    def connect_remotely(self):
+        pass    
+
+    def connect(self):
+        if self.locally:
             self.connect_locally()
         else:
             self.connect_remotely()
