@@ -1,3 +1,0 @@
-pyodbc
-pandas
-pymysql

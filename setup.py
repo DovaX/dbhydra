@@ -1,17 +1,17 @@
 import setuptools
-
+    
 with open("README.md", "r") as fh:
     long_description = fh.read()
-
+    
 setuptools.setup(
-    name="dbhydra",
-    version="0.1.4",
-    author="DovaX",
-    author_email="dovax.ai@gmail.com",
-    description="Data science friendly ORM combining Python, Pandas, and various SQL dialects ",
+    name='dbhydra',
+    version='0.2.4',
+    author='DovaX',
+    author_email='dovax.ai@gmail.com',
+    description='Data science friendly ORM combining Python',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/DovaX/dbhydra",
+    url='https://github.com/DovaX/dbhydra',
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -19,9 +19,8 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-          'pyodbc',
-          'pandas',
-          'pymysql',
-      ],
+          'pyodbc','pandas','pymysql','pymongo'
+     ],
     python_requires='>=3.6',
 )
+    
