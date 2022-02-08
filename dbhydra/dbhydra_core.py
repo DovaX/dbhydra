@@ -197,6 +197,10 @@ class AbstractDB(abc.ABC):
         self.DB_DATABASE=db_details["DB_DATABASE"]
         self.DB_USERNAME = db_details["DB_USERNAME"]
         self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        if "DB_PORT" in db_details.keys():
+            self.DB_PORT = int(db_details["DB_PORT"])
+        else:
+            self.DB_PORT = None
         
         if "DB_DRIVER" in db_details.keys():
             self.DB_DRIVER = db_details["DB_DRIVER"]
@@ -338,7 +342,10 @@ class Mysqldb(AbstractDB):
         print("DB connection established")
         
     def connect_remotely(self):
-        self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
+        if self.DB_PORT is not None:
+            self.connection = MySQLdb.connect(host=self.DB_SERVER,port=self.DB_PORT,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
+        else:    
+            self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
         
@@ -489,7 +496,8 @@ class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-    @save_migration
+    
+    #@save_migration
     def drop(self):
         query="DROP TABLE "+self.name
         print(query)
@@ -700,6 +708,7 @@ class MongoTable():
             self.print_nested_keys(dict_j,  columns, types )
         types = self.get_all_types(types)
         return columns, types
+    
     def get_all_types(self, types):
         print(types)
         types_list = []
@@ -775,7 +784,7 @@ class Table(Joinable,AbstractTable):
             
             query+="("
             for j in range(len(rows[k])):
-                if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
+                if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
                     query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
                     if replace_apostrophes:
@@ -868,6 +877,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
         
+    
+    def drop(self):
+        query="DROP TABLE "+self.name+";"
+        print(query)
+        self.db1.execute(query)
+    
     #@save_migration #TODO: Uncomment
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
@@ -902,12 +917,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             
             query+="("
             for j in range(len(rows[k])):
-                if rows[k][j]=="NULL" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
+                if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
                     
                     if "int" in self.types[j+1]:
                         if replace_apostrophes:
                             rows[k][j]=str(rows[k][j]).replace("'","")
-                        query+="NULL"
+                        query+="NULL,"
                     else:
                         query+="NULL,"
                 elif "nvarchar" in self.types[j+1]:
