@@ -513,6 +513,16 @@ class AbstractTable(AbstractJoinable):
 
     def insert_from_df(self,df,batch=1,try_mode=False):
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
+
+        pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
+                              pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
+                              pd.Float32Dtype(), pd.Float64Dtype()}
+        pd_nullable_columns = df.dtypes.isin(pd_nullable_dtypes)
+
+        # cast pd nullable columns to float - changing to 'NULL' then proceeds without an error.
+        # in database floats are again casted to integers where required
+        df = df.copy()
+        df.loc[:, pd_nullable_columns] = df.loc[:, pd_nullable_columns].astype(float)
         
         #handling nan values -> change to NULL TODO
         for column in list(df.columns):
