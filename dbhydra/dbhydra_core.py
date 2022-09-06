@@ -192,6 +192,8 @@ class AbstractDB(abc.ABC):
         else:
             self.DB_DRIVER = "ODBC Driver 13 for SQL Server"
 
+        self.connect()
+
     @abc.abstractmethod
     def connect_locally(self):
         pass
