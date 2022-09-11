@@ -11,6 +11,10 @@ from psycopg2 import sql
 import pickle
 import math
 
+from google.cloud import bigquery
+from google.oauth2 import service_account
+
+
 import abc
 
 def read_file(file):
@@ -393,6 +397,58 @@ class PostgresDb(AbstractDBPostgres):
             table_dict[table]=PostgresTable.init_all_columns(self, table)
 
         return(table_dict)
+    
+    
+
+    
+class BigQueryDb:
+    def __init__(self,credentials_path,project_id):
+        #super().__init__(None,None)
+        self.credentials_path=credentials_path
+        self.project_id=project_id
+        
+        self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
+
+        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id,)
+
+
+        
+    def connect_remotely(self):
+        print("Connect remotely")
+        
+    def connect_locally(self):
+        print("Connect locally")
+        
+        
+    def execute(self,query):
+        
+        
+        # query_job = self.client.query(
+        #     """
+        #     SELECT
+        #       CONCAT(
+        #         'https://stackoverflow.com/questions/',
+        #         CAST(id as STRING)) as url,
+        #       view_count
+        #     FROM `bigquery-public-data.stackoverflow.posts_questions`
+        #     WHERE tags like '%google-bigquery%'
+        #     ORDER BY view_count DESC
+        #     LIMIT 10"""
+        # )
+
+
+        
+        query_job = self.client.query(query)
+    
+        
+        results = query_job.result()  # Waits for job to complete.
+        
+        for row in results:
+            print(row)
+            
+            #print("{} : {} views".format(row.id, row.link,row.title))
+        
+        
 
 class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
