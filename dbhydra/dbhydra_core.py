@@ -951,7 +951,15 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         columns=temporary_table.get_all_columns()
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
-        
+
+    def get_last_id(self):
+        """
+        Returns the biggest id from table
+        """
+
+        last_id = self.select(f"SELECT id FROM {self.name} ORDER BY id DESC LIMIT 1;")
+
+        return last_id[0][0]
     
     def drop(self):
         query="DROP TABLE "+self.name+";"
