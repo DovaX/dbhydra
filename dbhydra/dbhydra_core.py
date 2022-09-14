@@ -423,7 +423,9 @@ class BigQueryDb:
         
     def connect_locally(self):
         print("Connect locally")
-        
+
+    def close_connection(self):
+        self.client.close()
         
     def execute(self,query):
         
