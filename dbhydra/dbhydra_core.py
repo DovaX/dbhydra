@@ -33,6 +33,11 @@ def read_connection_details(config_file):
         key=detail.split("=")[0]
         value=detail.split("=")[1]
         db_details[key]=value
+
+        # Skip empty lines to avoid error when reading config file
+        if not detail:
+            continue
+
     print(", ".join([db_details['DB_SERVER'],db_details['DB_DATABASE'],db_details['DB_USERNAME']]))
     return(db_details)
 
