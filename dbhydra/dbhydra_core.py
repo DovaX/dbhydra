@@ -984,7 +984,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
                             
-    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
+    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
         print("INSERTING!!!")
         assert len(self.columns)==len(self.types)
         print(self.types)
@@ -1039,10 +1039,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     try:
                         self.db1.execute(query)  
                     except Exception as e:
-                        file=open("log.txt","a")
-                        print("Query",query,"Could not be inserted:",e)
-                        file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
-                        file.close()
+                        print("Query", query, "Could not be inserted:", e)
+
+                        # Write to logs only in debug mode
+                        if debug_mode:
+                            with open("log.txt", "a") as file:
+                                file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
 
     def add_foreign_key(self,foreign_key):
         parent_id=foreign_key['parent_id']
