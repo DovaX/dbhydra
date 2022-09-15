@@ -576,7 +576,7 @@ class AbstractTable(AbstractJoinable):
         print(query)
         self.db1.execute(query)    
 
-    def insert_from_df(self,df,batch=1,try_mode=False):
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
@@ -598,7 +598,7 @@ class AbstractTable(AbstractJoinable):
             for j,record in enumerate(row):
                 if type(record)==str:
                     rows[i][j]="'"+record+"'"
-        self.insert(rows,batch=batch,try_mode=try_mode)
+        self.insert(rows,batch=batch,try_mode=try_mode, debug_mode=False)
         
     def delete(self,where=None):
         if where is None:
@@ -844,7 +844,7 @@ class Table(Joinable,AbstractTable):
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
         
-    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False):
+    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
         
         assert len(self.columns)==len(self.types)
         for k in range(len(rows)):
@@ -888,10 +888,12 @@ class Table(Joinable,AbstractTable):
                     try:
                         self.db1.execute(query)  
                     except Exception as e:
-                        file=open("log.txt","a")
-                        print("Query",query,"Could not be inserted:",e)
-                        file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
-                        file.close()
+                        print("Query", query, "Could not be inserted:", e)
+
+                        # Write to logs only in debug mode
+                        if debug_mode:
+                            with open("log.txt", "a") as file:
+                                file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
                             
     
         
@@ -1157,7 +1159,7 @@ class XlsxTable(AbstractTable):
         return(df)      
     
     
-    def insert_from_df(self,df,batch=1,try_mode=False):
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
         
         original_df=self.select_to_df()
