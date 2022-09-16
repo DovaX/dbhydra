@@ -78,12 +78,12 @@ def save_migration(function, *args, **kw): #decorator
         migrator=instance.db1.migrator
         migrator.migration_list.append(migration_dict)
         migrator.migration_list_to_json()
-            
-        
+
+
         function(instance,*args,**kw)
     return(new_function)
 
-        
+
 
 class Migrator:
     def __init__(self,db = None):
@@ -133,17 +133,17 @@ class Migrator:
             table.initialize_columns()
             table.initialize_types()
             table.drop_column(options["column_name"])
-            
+
     def next_migration(self):
         self.migration_number+=1
         self.migration_list=[]
-            
-      
+
+
     def migrate(self,migration_list):
         for i,migration_dict in enumerate(migration_list):
             self.process_migration_dict(migration_dict)
-           
-            
+
+
     def migrate_from_json(self,filename):
         with open(filename,"r") as f:
             rows=f.readlines()[0].replace("\n","")
@@ -151,11 +151,11 @@ class Migrator:
         for dict in result:
             self.process_migration_dict(dict)
         return(result)
-        
-        
+
+
     def migration_list_to_json(self, filename = None):
         result=json.dumps(self.migration_list)
-        
+
         if filename is None or filename == "" or filename.isspace():
             with open("migrations/migration-"+str(self.migration_number)+".json","w+") as f:
                 f.write(result)
@@ -164,7 +164,7 @@ class Migrator:
                 f.write(result)
 
     def create_migrations_from_df(self,name, dataframe):
-        
+
         columns, return_types = self.extract_columns_and_types_from_df(dataframe)
 
         migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
@@ -196,7 +196,7 @@ class Migrator:
 
 class AbstractDB(abc.ABC):
     def __init__(self,config_file="config.ini",db_details=None):
-        if db_details is None:    
+        if db_details is None:
             db_details=read_connection_details(config_file)
         self.locally=True
         if db_details["LOCALLY"]=="False":
@@ -210,35 +210,35 @@ class AbstractDB(abc.ABC):
             self.DB_PORT = int(db_details["DB_PORT"])
         else:
             self.DB_PORT = None
-        
+
         if "DB_DRIVER" in db_details.keys():
             self.DB_DRIVER = db_details["DB_DRIVER"]
         else:
             self.DB_DRIVER="ODBC Driver 13 for SQL Server"
-            
+
         self.connect()
-    
+
     @abc.abstractmethod
     def connect_locally(self):
         pass
 
     @abc.abstractmethod
     def connect_remotely(self):
-        pass    
+        pass
 
     def connect(self):
         if self.locally:
             self.connect_locally()
         else:
             self.connect_remotely()
-            
+
     def execute(self,query):
         self.cursor.execute(query)
-        self.cursor.commit() 
-        
+        self.cursor.commit()
+
     def close_connection(self):
         self.connection.close()
-        print("DB connection closed")  
+        print("DB connection closed")
 
     def initialize_migrator(self):
         self.migrator=Migrator(self)
@@ -267,7 +267,7 @@ class AbstractDBPostgres:
     def initialize_migrator(self):
         self.migrator=Migrator(self)
 
-        
+
 
 class AbstractDBMongo:
     def __init__(self, config_file="config-mongo.ini", db_details=None):
@@ -289,14 +289,14 @@ class AbstractDBMongo:
         #TODO, execute, close
 class db(AbstractDB):
     def connect_remotely(self):
-        
+
         self.connection = pyodbc.connect(
             r'DRIVER={'+self.DB_DRIVER+'};'
             r'SERVER=' + self.DB_SERVER + ';'
             r'DATABASE=' + self.DB_DATABASE + ';'
             r'UID=' + self.DB_USERNAME + ';'
             r'PWD=' + self.DB_PASSWORD + '',timeout=1
-        )      
+        )
         self.cursor = self.connection.cursor()
         print("DB connection established")
 
@@ -308,70 +308,70 @@ class db(AbstractDB):
             r'TRUSTED_CONNECTION=yes;',timeout=1
             #r'PWD=' + self.DB_PASSWORD + '')
         )
-        
+
         self.cursor = self.connection.cursor()
         print("DB connection established")
-    
+
     def get_all_tables(self):
         sysobjects_table=Table(self, "sysobjects",["name"],["nvarchar(100)"])
         query="select name from sysobjects where xtype='U'"
         rows=sysobjects_table.select(query)
         return(rows)
 
-    def generate_table_dict(self):        
+    def generate_table_dict(self):
         tables=self.get_all_tables()
         table_dict=dict()
         for i,table in enumerate(tables):
             table_dict[table]=Table.init_all_columns(self,table)
 
         return(table_dict)
-    
-    
+
+
     def get_foreign_keys_columns(self):
         sys_foreign_keys_columns_table=Table(self,"sys.foreign_key_columns",["parent_object_id","parent_column_id","referenced_object_id","referenced_column_id"],["int","int","int","int"])
         query="select parent_object_id,parent_column_id,referenced_object_id,referenced_column_id from sys.foreign_key_columns"
         rows=sys_foreign_keys_columns_table.select(query)
-        
+
         sys_foreign_keys_columns_table=Table(self,"sys.tables",["object_id","name"],["int","nvarchar(100)"])
         query="select object_id,name from sys.tables"
         table_names=sys_foreign_keys_columns_table.select(query)
-        
+
         table_id_name_dict={x[0]:x[1] for x in table_names}
-        
+
         foreign_keys=[]
         for i,row in enumerate(rows):
-            fk={"parent_table":table_id_name_dict[row[0]],"parent_column_id":row[1]-1,"referenced_table":table_id_name_dict[row[2]],"referenced_column_id":row[3]-1} #minus 1 because of indexing from 0  
+            fk={"parent_table":table_id_name_dict[row[0]],"parent_column_id":row[1]-1,"referenced_table":table_id_name_dict[row[2]],"referenced_column_id":row[3]-1} #minus 1 because of indexing from 0
             foreign_keys.append(fk)
-        
+
         return(foreign_keys)
-        
-        
-class Mysqldb(AbstractDB):           
+
+
+class Mysqldb(AbstractDB):
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-        
+
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER,port=self.DB_PORT,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
-        else:    
+        else:
             self.connection = MySQLdb.connect(host=self.DB_SERVER,user=self.DB_USERNAME,password=self.DB_PASSWORD,database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-        
+
     def execute(self,query):
         self.cursor.execute(query)
-        self.connection.commit() 
-       
+        self.connection.commit()
+
     def get_all_tables(self):
         sysobjects_table=Table(self, "information_schema.tables",["TABLE_NAME"],["nvarchar(100)"])
         query="SELECT TABLE_NAME,TABLE_TYPE,TABLE_SCHEMA FROM information_schema.tables where TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='"+self.DB_DATABASE+"' ;"
         rows=sysobjects_table.select(query)
         tables=[x[0] for x in rows]
-        return(tables) 
-       
-    def generate_table_dict(self):        
+        return(tables)
+
+    def generate_table_dict(self):
         tables=self.get_all_tables()
         table_dict=dict()
         for i,table in enumerate(tables):
@@ -402,34 +402,34 @@ class PostgresDb(AbstractDBPostgres):
             table_dict[table]=PostgresTable.init_all_columns(self, table)
 
         return(table_dict)
-    
-    
 
-    
+
+
+
 class BigQueryDb:
     def __init__(self,credentials_path,project_id):
         #super().__init__(None,None)
         self.credentials_path=credentials_path
         self.project_id=project_id
-        
+
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
 
         self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id,)
 
 
-        
+
     def connect_remotely(self):
         print("Connect remotely")
-        
+
     def connect_locally(self):
         print("Connect locally")
 
     def close_connection(self):
         self.client.close()
-        
+
     def execute(self,query):
-        
-        
+
+
         # query_job = self.client.query(
         #     """
         #     SELECT
@@ -444,18 +444,18 @@ class BigQueryDb:
         # )
 
 
-        
+
         query_job = self.client.query(query)
-    
-        
+
+
         results = query_job.result()  # Waits for job to complete.
-        
+
         for row in results:
             print(row)
-            
+
             #print("{} : {} views".format(row.id, row.link,row.title))
-        
-        
+
+
 
 class MongoDb(AbstractDBMongo):
     def connect_remotely(self):
@@ -484,13 +484,13 @@ class MongoDb(AbstractDBMongo):
             table_dict[table]=MongoTable.init_all_columns(self, table)
 
         return(table_dict)
-#Tables 
+#Tables
 class AbstractSelectable:
-    def __init__(self,db1,name,columns=None):  
+    def __init__(self,db1,name,columns=None):
         self.db1=db1
         self.name=name
         self.columns=columns
-    
+
     def select(self,query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
@@ -507,7 +507,7 @@ class AbstractSelectable:
         print(rows)
         if columns==1:
             cleared_rows_list = [item[0] for item in rows]
-        
+
         if columns>1:
             cleared_rows_list=[]
             for row in rows: #Because of unhashable type: 'pyodbc.Row'
@@ -515,9 +515,9 @@ class AbstractSelectable:
                 for i in range(columns):
                     #print(row)
                     list1.append(row[i])
-                cleared_rows_list.append(list1)  
+                cleared_rows_list.append(list1)
         return(cleared_rows_list)
-     
+
     def select_all(self):
         list1=self.select("SELECT * FROM "+self.name)
         return(list1)
@@ -526,34 +526,34 @@ class AbstractSelectable:
         rows=self.select_all()
         table_columns=self.columns
         demands_df=pd.DataFrame(rows,columns=table_columns)
-        return(demands_df)    
-    
+        return(demands_df)
+
     def export_to_xlsx(self):
         list1=self.select_all()
         df1=pd.DataFrame(list1,columns=["id"]+self.columns)
         df1.to_excel("items.xlsx")
-        
+
 class Selectable(AbstractSelectable): #Tables, views, and results of joins
     pass
 
-class MysqlSelectable(AbstractSelectable):      
+class MysqlSelectable(AbstractSelectable):
     def select(self,query):
         """TODO"""
         print(query)
         self.db1.execute(query)
         rows = self.db1.cursor.fetchall()
         return(rows)
-    
+
 class AbstractJoinable(AbstractSelectable):
     def __init__(self,db1,name,columns=None):
         super().__init__(db1,name,columns)
-    
+
     def inner_join(self,joinable,column1,column2):
         join_name=self.name+" INNER JOIN "+joinable.name+" ON "+column1+"="+column2
         join_columns=list(set(self.columns) | set(joinable.columns))
         new_joinable=Joinable(self.db1,join_name,join_columns)
         return(new_joinable)
- 
+
 class Joinable(Selectable):
     pass
 
@@ -561,20 +561,20 @@ class AbstractTable(AbstractJoinable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-    
+
     #@save_migration
     def drop(self):
         query="DROP TABLE "+self.name
         print(query)
         self.db1.execute(query)
-        
+
     def update(self,variable_assign,where=None):
         if where is None:
             query = "UPDATE "+self.name+" SET "+variable_assign
         else:
             query = "UPDATE "+self.name+" SET "+variable_assign+" WHERE "+where
         print(query)
-        self.db1.execute(query)    
+        self.db1.execute(query)
 
     def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
@@ -588,18 +588,18 @@ class AbstractTable(AbstractJoinable):
         # in database floats are again casted to integers where required
         df = df.copy()
         df.loc[:, pd_nullable_columns] = df.loc[:, pd_nullable_columns].astype(float)
-        
+
         #handling nan values -> change to NULL TODO
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = "NULL"
-        
+
         rows=df.values.tolist()
         for i,row in enumerate(rows):
             for j,record in enumerate(row):
                 if type(record)==str:
                     rows[i][j]="'"+record+"'"
         self.insert(rows,batch=batch,try_mode=try_mode, debug_mode=False)
-        
+
     def delete(self,where=None):
         if where is None:
             query = "DELETE FROM "+self.name
@@ -783,7 +783,7 @@ class MongoTable():
             self.print_nested_keys(dict_j,  columns, types )
         types = self.get_all_types(types)
         return columns, types
-    
+
     def get_all_types(self, types):
         print(types)
         types_list = []
@@ -807,15 +807,15 @@ class Table(Joinable,AbstractTable):
         """Override joinable init"""
         super().__init__(db1,name,columns)
         self.types=types
-        
-        
+
+
     @classmethod
     def init_all_columns(cls,db1,name):
         temporary_table=cls(db1,name)
         columns=temporary_table.get_all_columns()
         types=temporary_table.get_all_types()
         return(cls(db1,name,columns,types))
-        
+
     def get_all_columns(self):
         information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS')
         query="SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
@@ -836,16 +836,16 @@ class Table(Joinable,AbstractTable):
         query="CREATE TABLE "+self.name+"(id INT IDENTITY(1,1) NOT NULL,"
         for i in range(1,len(self.columns)):
             query+=self.columns[i]+" "+self.types[i]+","
-        query+="PRIMARY KEY(id))"        
+        query+="PRIMARY KEY(id))"
         print(query)
         try:
             self.db1.execute(query)
         except Exception as e:
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
-        
+
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
-        
+
         assert len(self.columns)==len(self.types)
         for k in range(len(rows)):
             if k%batch==0:
@@ -856,7 +856,7 @@ class Table(Joinable,AbstractTable):
                 if len(rows)<len(self.columns):
                     print(len(self.columns)-len(rows),"columns were not specified")
                 query=query[:-1]+") VALUES "
-            
+
             query+="("
             for j in range(len(rows[k])):
                 if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
@@ -878,15 +878,18 @@ class Table(Joinable,AbstractTable):
                 else:
                     query+=str(rows[k][j])+","
 
-            query=query[:-1]+"),"            
+            query=query[:-1]+"),"
             if k%batch==batch-1 or k==len(rows)-1:
                 query=query[:-1]
-                print(query)
+
+                if debug_mode:
+                    print(query)
+
                 if not try_mode:
-                    self.db1.execute(query) 
+                    self.db1.execute(query)
                 else:
                     try:
-                        self.db1.execute(query)  
+                        self.db1.execute(query)
                     except Exception as e:
                         print("Query", query, "Could not be inserted:", e)
 
@@ -894,11 +897,11 @@ class Table(Joinable,AbstractTable):
                         if debug_mode:
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
-                            
-    
-        
-        
-    
+
+
+
+
+
     def get_foreign_keys_for_table(self,table_dict,foreign_keys):
         #table_dict is in format from db function: generate_table_dict()
         #foreign_keys are in format from db function: get_foreign_keys_columns()
@@ -916,13 +919,13 @@ class Table(Joinable,AbstractTable):
                     print("Warning: IndexError for foreign key self.columns[fk[parent_column_id]]:",e)
         return(parent_foreign_keys)
 
-             
-       
+
+
 class MysqlTable(MysqlSelectable,AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-     
+
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
@@ -945,8 +948,8 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
         types=information_schema_table.select(query)
         return(types)
-        
-     
+
+
     @classmethod
     def init_all_columns(cls,db1,name):
         temporary_table=cls(db1,name)
@@ -962,12 +965,12 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         last_id = self.select(f"SELECT id FROM {self.name} ORDER BY id DESC LIMIT 1;")
 
         return last_id[0][0]
-    
+
     def drop(self):
         query="DROP TABLE "+self.name+";"
         print(query)
         self.db1.execute(query)
-    
+
     #@save_migration #TODO: Uncomment
     def create(self,foreign_keys=None):
         assert len(self.columns)==len(self.types)
@@ -985,7 +988,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         except Exception as e:
             print("Table "+self.name+" already exists:",e)
             print("Check the specification of table columns and their types")
-                            
+
     def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
         print("INSERTING!!!")
         assert len(self.columns)==len(self.types)
@@ -999,11 +1002,11 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                 if len(rows)<len(self.columns):
                     print(len(self.columns)-len(rows),"columns were not specified")
                 query=query[:-1]+") VALUES "
-            
+
             query+="("
             for j in range(len(rows[k])):
                 if rows[k][j]=="NULL" or rows[k][j]=="'NULL'" or rows[k][j]==None or rows[k][j]=="None": #NaN hodnoty
-                    
+
                     if "int" in self.types[j+1]:
                         if replace_apostrophes:
                             rows[k][j]=str(rows[k][j]).replace("'","")
@@ -1026,20 +1029,23 @@ class MysqlTable(MysqlSelectable,AbstractTable):
                     query+="'"+str(rows[k][j])+"',"
                 elif "date" in self.types[j+1]:
                     query+="'"+str(rows[k][j])+"',"
-                
-                
+
+
                 else:
                     query+=str(rows[k][j])+","
 
-            query=query[:-1]+"),"            
+            query=query[:-1]+"),"
             if k%batch==batch-1 or k==len(rows)-1:
                 query=query[:-1]
-                print(query)
+
+                if debug_mode:
+                    print(query)
+
                 if not try_mode:
-                    self.db1.execute(query) 
+                    self.db1.execute(query)
                 else:
                     try:
-                        self.db1.execute(query)  
+                        self.db1.execute(query)
                     except Exception as e:
                         print("Query", query, "Could not be inserted:", e)
 
@@ -1051,7 +1057,7 @@ class MysqlTable(MysqlSelectable,AbstractTable):
     def add_foreign_key(self,foreign_key):
         parent_id=foreign_key['parent_id']
         parent=foreign_key['parent']
-        query="ALTER TABLE "+self.name+" MODIFY "+parent_id+" INT UNSIGNED"            
+        query="ALTER TABLE "+self.name+" MODIFY "+parent_id+" INT UNSIGNED"
         print(query)
         self.db1.execute(query)
         query="ALTER TABLE "+self.name+" ADD FOREIGN KEY ("+parent_id+") REFERENCES "+parent+"(id)"
@@ -1093,13 +1099,13 @@ class MysqlTable(MysqlSelectable,AbstractTable):
         except:
             print("Cant modify column to table.")
 
-        
+
 
 
 class XlsxDB:
-    def __init__(self,name="new_db",config_file="config.ini"):   
+    def __init__(self,name="new_db",config_file="config.ini"):
         self.name=name
-        
+
         """
         db_details=read_connection_details(config_file)
         locally=True
@@ -1119,18 +1125,18 @@ class XlsxDB:
             self.DB_PASSWORD = db_details["DB_PASSWORD"]
             self.connect_remotely()
         """
-            
+
     def execute(self,query):
         pass
         #self.cursor.execute(query)
-        #self.cursor.commit() 
-        
+        #self.cursor.commit()
+
     def close_connection(self):
         pass
         #self.connection.close()
-        #print("DB connection closed")  
-        
-        
+        #print("DB connection closed")
+
+
     def create_database(self):
         import os
         try:
@@ -1138,13 +1144,13 @@ class XlsxDB:
             print("Database created")
         except:
             print("Database is already created")
- 
-        
+
+
 class XlsxTable(AbstractTable):
     def __init__(self,db1,name,columns=None,types=None):
         super().__init__(db1,name,columns)
         self.types=types
-        
+
     def select_to_df(self):
         try:
             df=pd.read_excel(self.db1.name+"//"+self.name+".xlsx")
@@ -1152,13 +1158,13 @@ class XlsxTable(AbstractTable):
             #print(cols)
             #df.set_index(cols[0],inplace=True)
             #df.drop(df.columns[0],axis=1,inplace=True)
-        
+
         except Exception as e:
             print("Error: ",e)
             df=pd.DataFrame(columns=self.columns)
-        return(df)      
-    
-    
+        return(df)
+
+
     def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
         
