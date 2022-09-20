@@ -427,6 +427,12 @@ class BigQueryDb:
     def close_connection(self):
         self.client.close()
 
+    def select_to_df(self, query):
+        print(query)
+        df = pd.read_gbq(query=query, project_id=self.project_id, credentials=self.credentials)
+
+        return df
+
     def execute(self,query):
 
 
