@@ -7,6 +7,7 @@ import psycopg2
 import math
 import json
 import abc
+from contextlib import contextmanager
 
 
 def read_file(file):
@@ -207,6 +208,14 @@ class AbstractDB(abc.ABC):
             self.connect_locally()
         else:
             self.connect_remotely()
+
+    @contextmanager
+    def connect_to_db(self):
+        try:
+            self._connect()
+            yield None
+        finally:
+            self.close_connection()
 
     def execute(self, query):
         self.cursor.execute(query)
@@ -1158,15 +1167,3 @@ def df_to_dict(df, column1, column2):
 def dict_to_df(dictionary, column1, column2):
     df = pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
     return (df)
-
-
-from contextlib import contextmanager
-
-
-@contextmanager
-def connect_to_db(db_instance):
-    try:
-        db_instance.connect()
-        yield None
-    finally:
-        db_instance.close_connection()
