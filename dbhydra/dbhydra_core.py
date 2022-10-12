@@ -203,7 +203,15 @@ class AbstractDB(abc.ABC):
     def connect_remotely(self):
         pass
 
+
+    def _connect(self):
+        if self.locally:
+            self.connect_locally()
+        else:
+            self.connect_remotely()
+
     def connect(self):
+        print("DEPRECATION WARNING: use `connect_to_db` context manager instead of `connect` method")
         if self.locally:
             self.connect_locally()
         else:
