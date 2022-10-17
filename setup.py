@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
     
 setuptools.setup(
     name='dbhydra',
-    version='0.2.4',
+    version='0.2.8',
     author='DovaX',
     author_email='dovax.ai@gmail.com',
     description='Data science friendly ORM combining Python',
@@ -19,7 +19,7 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-          'pyodbc','pandas','pymysql','pymongo'
+          'pyodbc','pandas','pymysql','pymongo','psycopg2','google-cloud-bigquery'
      ],
     python_requires='>=3.6',
 )
