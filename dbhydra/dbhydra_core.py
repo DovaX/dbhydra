@@ -190,9 +190,11 @@ class AbstractDB(abc.ABC):
     def __init__(self, config_file="config.ini", db_details=None):
         if db_details is None:
             db_details = read_connection_details(config_file)
-        self.locally = bool(db_details.get("LOCALLY", "False"))
-
-
+            
+        self.locally=True
+        if db_details["LOCALLY"]=="False":
+            self.locally=False  
+        
         self.DB_SERVER = db_details["DB_SERVER"]
         self.DB_DATABASE = db_details["DB_DATABASE"]
         self.DB_USERNAME = db_details["DB_USERNAME"]
