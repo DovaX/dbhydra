@@ -1,20 +1,26 @@
-#Auto generates XML files for liquibase for DORM tables
+# Auto generates XML files for liquibase for DORM tables
 
 import dbhydra as dh
 
+
 def generate_xml(file):
-    with open(file,"a+") as f:
+    with open(file, "a+") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         f.write('<databaseChangeLog\n')
         f.write('xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n')
         f.write('xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"\n')
         f.write('xmlns="http://www.liquibase.org/xml/ns/dbchangelog"\n')
-        f.write('xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd\n')
+        f.write(
+            'xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog '
+            'http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd\n')
         f.write('xmlns="http://www.liquibase.org/xml/ns/dbchangelog"\n')
-        f.write('http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">\n')
-        
-def create_table(file): 
-    with open(file,"a+") as f:
+        f.write(
+            'http://www.liquibase.org/xml/ns/dbchangelog-ext '
+            'http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">\n')
+
+
+def create_table(file):
+    with open(file, "a+") as f:
         f.write('<changeSet author="dominik" id="20200210-1">\n')
 
         f.write('<createTable tableName="generic_companies">\n')
@@ -51,6 +57,6 @@ def create_table(file):
 
         f.write('</databaseChangeLog>\n')
 
+
 generate_xml("text.txt")
 create_table("text.txt")
-
