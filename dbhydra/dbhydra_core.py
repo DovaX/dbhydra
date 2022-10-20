@@ -2,6 +2,7 @@
 import pymongo
 import pyodbc
 import pandas as pd
+import numpy as np
 import pymysql as MySQLdb
 import psycopg2
 import math
@@ -24,7 +25,7 @@ def read_file(file):
         for i,row in enumerate(rows):
             rows[i]=row.replace("\n","")
     return(rows)
-    
+
 def read_connection_details(config_file):
     connection_details=read_file(config_file)
     db_details={}
@@ -567,8 +568,46 @@ class AbstractTable(AbstractJoinable):
         print(query)
         self.db1.execute(query)
 
-    def insert_from_df(self, df, batch=1, try_mode=False):
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
+    def adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
+        """
+        Adjust DataFrame in case number iof its columns differs from number of columns in DB table.
+        :param df: original DF
+        :param debug_mode: in debug mode a warning will be printed to console
+        :return: adjusted DF
+        """
+
+        df_copy = df.copy()
+
+        # DataFrame has less columns
+        if len(self.columns) - len(df_copy.columns) > 1:
+            difference_columns = list(set(self.columns).difference(set(df_copy.columns)).difference(set(['id'])))
+
+            if debug_mode:
+                print(f'DataFrame contains less columns than DB table. Missing columns {difference_columns} will be added as empty.')
+
+            for col in difference_columns:
+                df_copy[col] = np.nan
+
+        # DataFrame has more columns
+        elif len(self.columns) < len(df_copy.columns):
+            difference_columns = list(set(df_copy.columns).difference(set(self.columns)))
+
+            if debug_mode:
+                print(f'DataFrame contains more columns than DB table. Extra columns {difference_columns} will be removed.')
+
+            df_copy.drop(difference_columns, axis=1, inplace=True)
+
+        # Ensure the same order of columns in DF as in DB table
+        cols_order = [x for x in self.columns if x != 'id']
+        df_copy = df_copy[cols_order]
+
+        return df_copy
+
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
+        if adjust_df:
+            df = self.adjust_df(df, debug_mode)
+
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
