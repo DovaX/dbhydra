@@ -568,7 +568,7 @@ class AbstractTable(AbstractJoinable):
         print(query)
         self.db1.execute(query)
 
-    def adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
+    def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
         Adjust DataFrame in case number of its columns differs from number of columns in DB table.
         :param df: original DF
@@ -603,7 +603,7 @@ class AbstractTable(AbstractJoinable):
 
     def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
         if adjust_df:
-            df = self.adjust_df(df, debug_mode)
+            df = self._adjust_df(df, debug_mode)
 
         assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
