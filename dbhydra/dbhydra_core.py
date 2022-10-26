@@ -237,6 +237,14 @@ class AbstractDB(abc.ABC):
         else:
             self.connect_remotely()
 
+    #@abc.abstractmethod
+    def get_all_tables(self):
+        pass
+
+    #@abc.abstractmethod
+    def generate_table_dict(self):
+        pass
+
     @contextmanager
     def connect_to_db(self):
         try:
@@ -244,6 +252,13 @@ class AbstractDB(abc.ABC):
             yield None
         finally:
             self.close_connection()
+
+    @contextmanager
+    def connect_to_table(self, table_name):
+        with self.connect_to_db():
+            table = self.generate_table_dict()[table_name]
+
+            yield table
 
     def execute(self, query):
         self.cursor.execute(query)
