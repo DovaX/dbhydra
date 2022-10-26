@@ -2,6 +2,7 @@
 import pymongo
 import pyodbc
 import pandas as pd
+import numpy as np
 import pymysql as MySQLdb
 import psycopg2
 import math
@@ -602,8 +603,44 @@ class AbstractTable(AbstractJoinable):
         print(query)
         self.db1.execute(query)
 
-    def insert_from_df(self, df, batch=1, try_mode=False):
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
+    def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
+        """
+        Adjust DataFrame in case number of its columns differs from number of columns in DB table.
+        :param df: original DF
+        :param debug_mode: in debug mode a warning will be printed to console
+        :return: adjusted DF
+        """
+
+        df_copy = df.copy()
+
+        difference_columns_missing = list(set(self.columns).difference(set(df_copy.columns)).difference({'id'}))
+
+        if difference_columns_missing:
+            if debug_mode:
+                print(f'DataFrame missing columns {difference_columns_missing} will be added as empty.')
+
+            for col in difference_columns_missing:
+                df_copy[col] = np.nan
+
+        difference_columns_extra = list(set(df_copy.columns).difference(set(self.columns)))
+
+        if difference_columns_extra:
+            if debug_mode:
+                print(f'DataFrame extra columns {difference_columns_extra} will be removed.')
+
+            df_copy.drop(difference_columns_extra, axis=1, inplace=True)
+
+        # Ensure the same order of columns in DF as in DB table
+        cols_order = [x for x in self.columns if x != 'id']
+        df_copy = df_copy[cols_order]
+
+        return df_copy
+
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
+        if adjust_df:
+            df = self._adjust_df(df, debug_mode)
+
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
@@ -620,12 +657,12 @@ class AbstractTable(AbstractJoinable):
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = "NULL"
 
-        rows = df.values.tolist()
-        for i, row in enumerate(rows):
-            for j, record in enumerate(row):
-                if type(record) == str:
-                    rows[i][j] = "'" + record + "'"
-        self.insert(rows, batch=batch, try_mode=try_mode)
+        rows=df.values.tolist()
+        for i,row in enumerate(rows):
+            for j,record in enumerate(row):
+                if type(record)==str:
+                    rows[i][j]="'"+record+"'"
+        self.insert(rows,batch=batch,try_mode=try_mode, debug_mode=False)
 
     def delete(self, where=None):
 
@@ -886,7 +923,7 @@ class Table(Joinable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False):
+    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
 
         assert len(self.columns) == len(self.types)
         for k in range(len(rows)):
@@ -922,10 +959,12 @@ class Table(Joinable, AbstractTable):
                 else:
                     query += str(rows[k][j]) + ","
 
-            query = query[:-1] + "),"
-            if k % batch == batch - 1 or k == len(rows) - 1:
-                query = query[:-1]
-                print(query)
+            query=query[:-1]+"),"
+            if k%batch==batch-1 or k==len(rows)-1:
+                query=query[:-1]
+
+                if debug_mode:
+                    print(query)
 
                 if not try_mode:
                     self.db1.execute(query)
@@ -935,12 +974,12 @@ class Table(Joinable, AbstractTable):
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
-                        debug_mode=True
+
                         # Write to logs only in debug mode
                         if debug_mode:
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
-                        file.close()
+
 
 
 
@@ -1038,7 +1077,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False):
+    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
@@ -1084,10 +1123,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                 else:
                     query += str(rows[k][j]) + ","
 
-            query = query[:-1] + "),"
-            if k % batch == batch - 1 or k == len(rows) - 1:
-                query = query[:-1]
-                print(query)
+            query=query[:-1]+"),"
+            if k%batch==batch-1 or k==len(rows)-1:
+                query=query[:-1]
+
+                if debug_mode:
+                    print(query)
 
                 if not try_mode:
                     self.db1.execute(query)
@@ -1097,7 +1138,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
-                        debug_mode=True
+
                         # Write to logs only in debug mode
                         if debug_mode:
                             with open("log.txt", "a") as file:
@@ -1214,8 +1255,9 @@ class XlsxTable(AbstractTable):
             df = pd.DataFrame(columns=self.columns)
         return (df)
 
-    def insert_from_df(self, df, batch=1, try_mode=False):
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
+
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
         original_df = self.select_to_df()
 
