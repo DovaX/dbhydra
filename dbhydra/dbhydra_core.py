@@ -2,6 +2,7 @@
 import pymongo
 import pyodbc
 import pandas as pd
+import numpy as np
 import pymysql as MySQLdb
 import psycopg2
 import math
@@ -602,8 +603,44 @@ class AbstractTable(AbstractJoinable):
         print(query)
         self.db1.execute(query)
 
-    def insert_from_df(self, df, batch=1, try_mode=False):
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
+    def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
+        """
+        Adjust DataFrame in case number of its columns differs from number of columns in DB table.
+        :param df: original DF
+        :param debug_mode: in debug mode a warning will be printed to console
+        :return: adjusted DF
+        """
+
+        df_copy = df.copy()
+
+        difference_columns_missing = list(set(self.columns).difference(set(df_copy.columns)).difference({'id'}))
+
+        if difference_columns_missing:
+            if debug_mode:
+                print(f'DataFrame missing columns {difference_columns_missing} will be added as empty.')
+
+            for col in difference_columns_missing:
+                df_copy[col] = np.nan
+
+        difference_columns_extra = list(set(df_copy.columns).difference(set(self.columns)))
+
+        if difference_columns_extra:
+            if debug_mode:
+                print(f'DataFrame extra columns {difference_columns_extra} will be removed.')
+
+            df_copy.drop(difference_columns_extra, axis=1, inplace=True)
+
+        # Ensure the same order of columns in DF as in DB table
+        cols_order = [x for x in self.columns if x != 'id']
+        df_copy = df_copy[cols_order]
+
+        return df_copy
+
+    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
+        if adjust_df:
+            df = self._adjust_df(df, debug_mode)
+
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
