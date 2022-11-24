@@ -7,7 +7,7 @@ import pymysql as MySQLdb
 import psycopg2
 import math
 import json
-
+import ast
 
 from google.cloud import bigquery
 from google.oauth2 import service_account
@@ -15,6 +15,9 @@ from google.oauth2 import service_account
 
 import abc
 from contextlib import contextmanager
+
+MONGO_OPERATOR_DICT ={"=": "$eq", ">": "$gt", ">=": "$gte", " IN " : "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
+
 
 
 def read_file(file):
@@ -358,6 +361,16 @@ class Mysqldb(AbstractDB):
         self.cursor = self.connection.cursor()
         print("DB connection established")
 
+    def create_new_db(self):
+        self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME,
+                                             password=self.DB_PASSWORD,
+                                             charset="utf8mb4" , cursorclass=MySQLdb.cursors.DictCursor)
+
+        self.cursor = self.connection.cursor()
+
+        create_db_command = "CREATE DATABASE " + self.DB_DATABASE
+        self.execute(create_db_command)
+
     def execute(self, query):
 
         self.cursor.execute(query)
@@ -379,6 +392,15 @@ class Mysqldb(AbstractDB):
 
 
 class PostgresDb(AbstractDBPostgres):
+
+    def connect_locally(self):
+        self.connection= psycopg2.connect(
+            host=self.DB_SERVER,
+            database=self.DB_DATABASE,
+            user=self.DB_USERNAME,
+            password=self.DB_PASSWORD)
+        self.cursor=self.connection.cursor()
+
     def connect_remotely(self):
         self.connection = psycopg2.connect(
             host=self.DB_SERVER,
@@ -390,6 +412,7 @@ class PostgresDb(AbstractDBPostgres):
 
     def execute(self, query):
         self.cursor.execute(query)
+        self.connection.commit()
 
         # return  [''.join(i) for i in self.cursor.fetchall()]
 
@@ -468,8 +491,20 @@ class BigQueryDb:
 
 
 class MongoDb(AbstractDBMongo):
+
+    def connect_locally(self):
+        self.connection= pymongo.MongoClient(
+            host=self.DB_SERVER,
+            authSource=self.DB_DATABASE,
+            username=self.DB_USERNAME,
+            password=self.DB_PASSWORD,
+            authMechanism='SCRAM-SHA-256'
+            )
+
+        self.database=self.connection.get_database(self.DB_DATABASE)
+        print('Connected locally')
+
     def connect_remotely(self):
-        # self.connection = MySQLdb.connect(self.DB_SERVER, self.DB_USERNAME, self.DB_PASSWORD, self.DB_DATABASE)
         self.connection = pymongo.MongoClient(
             "mongodb+srv://" + self.DB_USERNAME + ":" + self.DB_PASSWORD + "@" + self.DB_SERVER + "/" + self.DB_DATABASE + "?retryWrites=true&w=majority")
         print(self.connection.list_database_names())
@@ -498,6 +533,7 @@ class MongoDb(AbstractDBMongo):
             table_dict[table] = MongoTable.init_all_columns(self, table)
 
         return (table_dict)
+
 
 
 # Tables
@@ -636,11 +672,13 @@ class AbstractTable(AbstractJoinable):
 
         return df_copy
 
+
     def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
+
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
-        assert len(df.columns)+1==len(self.columns) #+1 because of id column
+        # assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
@@ -723,6 +761,76 @@ class PostgresTable(AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
+
+    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
+        print("INSERTING!!!")
+        assert len(self.columns) == len(self.types)
+        print(self.types)
+        for k in range(len(rows)):
+            if k % batch == 0:
+                query = "INSERT INTO " + self.name + " ("
+                for i in range(1, len(self.columns)):
+                    if i < len(rows[k]) + 1:
+                        query += self.columns[i] + ","
+                if len(rows) < len(self.columns):
+                    print(len(self.columns) - len(rows), "columns were not specified")
+                query = query[:-1] + ") VALUES "
+
+            query += "("
+            for j in range(len(rows[k])):
+                if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][j] == "None":  # NaN hodnoty
+                    if "int" in self.types[j + 1]:
+
+                        if replace_apostrophes:
+                            rows[k][j] = str(rows[k][j]).replace("'", "")
+                        query += "NULL,"
+                    else:
+                        query += "NULL,"
+                elif "nvarchar" in self.types[j + 1]:
+                    if replace_apostrophes:
+                        rows[k][j] = str(rows[k][j]).replace("'", "")
+                    query += "N'" + str(rows[k][j]) + "',"
+                elif "varchar" in self.types[j + 1]:
+                    if replace_apostrophes:
+                        rows[k][j] = str(rows[k][j]).replace("'", "")
+                    query += "'" + str(rows[k][j]) + "',"
+                elif self.types[j + 1] == "int":
+                    query += str(rows[k][j]) + ","
+                elif "datetime" in self.types[j + 1]:
+                    if replace_apostrophes:
+                        rows[k][j] = str(rows[k][j]).replace("'", "")
+                    query += "'" + str(rows[k][j]) + "',"
+                elif "date" in self.types[j + 1]:
+                    query += "'" + str(rows[k][j]) + "',"
+
+
+
+                else:
+                    query += str(rows[k][j]) + ","
+
+            query=query[:-1]+"),"
+            if k%batch==batch-1 or k==len(rows)-1:
+                query=query[:-1]
+
+                if debug_mode:
+                    print(query)
+
+                if not try_mode:
+                    self.db1.execute(query)
+                else:
+                    try:
+                        self.db1.execute(query)
+                    except Exception as e:
+
+                        print("Query", query, "Could not be inserted:", e)
+
+                        # Write to logs only in debug mode
+                        if debug_mode:
+                            with open("log.txt", "a") as file:
+                                file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
+
+
+
     @save_migration
     def add_column(self, column_name, column_type):
         assert len(column_name) > 1
@@ -763,14 +871,18 @@ class PostgresTable(AbstractTable):
 class MongoTable():
     def __init__(self, db, name, columns=[], types=[]):
         self.name = name
-        self.db = db
+        self.db1 = db
         print("==========================================")
         print(type(db))
         print(db)
-        self.collection = self.db.createTable(name)
+        self.collection = self.db1.createTable(name)
+
 
     def drop(self):
         return self.collection.drop()
+
+    def update_collection(self):
+        self.collection = self.db1.createTable(self.name)
 
     def insert(self, document):
         return self.collection.insert_one(document)
@@ -796,13 +908,16 @@ class MongoTable():
             return list(self.collection.find(query, columns).sort(fieldname, direction))
 
     def delete(self, query={}):
+        self.collection = self.db1.createTable(self.name)
         return self.collection.delete_many(query)
 
     def update(self, query, newvalues):
-        return self.collection.update(query, newvalues)
+        return self.collection.update_many(query, newvalues)
+
 
     def insertFromDataFrame(self, dataframe):
-        return self.collection.insert_many(dataframe.to_dict)
+        dict_from_df = dataframe.to_dict('record')
+        return self.collection.insert_many(dict_from_df)
 
     def select_to_df(self, query={}):
         print(type(pd.DataFrame(list(self.collection.find(query)))))
