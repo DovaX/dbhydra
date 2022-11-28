@@ -366,10 +366,13 @@ class Mysqldb(AbstractDB):
                                              password=self.DB_PASSWORD,
                                              charset="utf8mb4" , cursorclass=MySQLdb.cursors.DictCursor)
 
-        self.cursor = self.connection.cursor()
+        # with self.connection:
+        with self.connection.cursor() as cursor:
+            create_db_command = "CREATE DATABASE " + self.DB_DATABASE
+            cursor.execute(create_db_command)
 
-        create_db_command = "CREATE DATABASE " + self.DB_DATABASE
-        self.execute(create_db_command)
+        self.connection.commit()
+
 
     def execute(self, query):
 
@@ -678,7 +681,7 @@ class AbstractTable(AbstractJoinable):
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
-        # assert len(df.columns)+1==len(self.columns) #+1 because of id column
+        assert len(df.columns)+1==len(self.columns) #+1 because of id column
 
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
