@@ -366,7 +366,6 @@ class Mysqldb(AbstractDB):
                                              password=self.DB_PASSWORD,
                                              charset="utf8mb4" , cursorclass=MySQLdb.cursors.DictCursor)
 
-        # with self.connection:
         with self.connection.cursor() as cursor:
             create_db_command = "CREATE DATABASE " + self.DB_DATABASE
             cursor.execute(create_db_command)
