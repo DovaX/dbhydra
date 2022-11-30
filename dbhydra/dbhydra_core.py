@@ -522,8 +522,12 @@ class MongoDb(AbstractDBMongo):
     def get_all_tables(self):
         return self.database.list_collection_names()
 
-    def createTable(self, name):
+    def create_table(self, name):
         return self.database[name]
+
+    def createTable(self, name):
+        print("WARNING: `createTable` method will be deprecated in favor of `create_table`")
+        return self.create_table(name)
 
     def close_connection(self):
         self.connection.close()
@@ -878,20 +882,24 @@ class MongoTable():
         print("==========================================")
         print(type(db))
         print(db)
-        self.collection = self.db1.createTable(name)
+        self.collection = self.db1.create_table(name)
 
 
     def drop(self):
         return self.collection.drop()
 
     def update_collection(self):
-        self.collection = self.db1.createTable(self.name)
+        self.collection = self.db1.create_table(self.name)
 
     def insert(self, document):
         return self.collection.insert_one(document)
 
-    def insertMore(self, documents):
+    def insert_more(self, documents):
         return self.collection.insert_many(documents)
+
+    def insertMore(self, documents):
+        print("WARNING: `insertMore` method will be deprecated in favor of `insert_more`")
+        return self.insert_more(documents)
 
     def select(self, query, columns={}):
 
@@ -904,11 +912,15 @@ class MongoTable():
     def select_all(self, query={}):
         return list(self.collection.find(query))
 
-    def selectSort(self, query, fieldname, direction, columns={}):
+    def select_sort(self, query, fieldname, direction, columns={}):
         if (len(columns) == 0):
             return list(self.collection.find(query).sort(fieldname, direction))
         else:
             return list(self.collection.find(query, columns).sort(fieldname, direction))
+
+    def selectSort(self, query, fieldname, direction, columns={}):
+        print("WARNING: `selectSort` method will be deprecated in favor of `select_sort`")
+        return self.select_sort(query, fieldname, direction, columns)
 
     def delete(self, query={}):
         self.collection = self.db1.createTable(self.name)
@@ -924,6 +936,9 @@ class MongoTable():
         # dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
         return self.collection.insert_many(dict_from_df)
 
+    def insertFromDataFrame(self, dataframe):
+        print("WARNING: `insertFromDataFrame` method will be deprecated in favor of `insert_from_df`")
+        return self.insert_from_df(dataframe)
 
     def select_to_df(self, query={}):
         print(type(pd.DataFrame(list(self.collection.find(query)))))
