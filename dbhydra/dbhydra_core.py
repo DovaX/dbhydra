@@ -914,13 +914,15 @@ class MongoTable():
         self.collection = self.db1.createTable(self.name)
         return self.collection.delete_many(query)
 
-    def update(self, query, newvalues):
+    def update(self, newvalues, query):
         return self.collection.update_many(query, newvalues)
 
 
-    def insertFromDataFrame(self, dataframe):
-        dict_from_df = dataframe.to_dict('record')
+    def insert_from_df(self, dataframe):
+        # dict_from_df = dataframe.to_dict('record')
+        dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
         return self.collection.insert_many(dict_from_df)
+
 
     def select_to_df(self, query={}):
         print(type(pd.DataFrame(list(self.collection.find(query)))))
