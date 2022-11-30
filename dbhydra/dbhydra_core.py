@@ -923,7 +923,7 @@ class MongoTable():
         return self.select_sort(query, fieldname, direction, columns)
 
     def delete(self, query={}):
-        self.collection = self.db1.createTable(self.name)
+        self.collection = self.db1.create_table(self.name)
         return self.collection.delete_many(query)
 
     def update(self, newvalues, query):
