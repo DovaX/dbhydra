@@ -919,8 +919,9 @@ class MongoTable():
 
 
     def insert_from_df(self, dataframe):
-        # dict_from_df = dataframe.to_dict('record')
-        dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
+        dataframe = dataframe.replace({pd.NA: None})
+        dict_from_df = dataframe.to_dict('records')
+        # dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
         return self.collection.insert_many(dict_from_df)
 
 
