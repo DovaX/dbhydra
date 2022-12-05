@@ -855,6 +855,9 @@ class MongoTable():
         print(db)
         self.collection = self.db1.create_table(name)
 
+    def create(self):
+        pass
+
     def drop(self):
         return self.collection.drop()
 
