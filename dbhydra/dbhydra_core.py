@@ -12,12 +12,10 @@ import ast
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-
 import abc
 from contextlib import contextmanager
 
-MONGO_OPERATOR_DICT ={"=": "$eq", ">": "$gt", ">=": "$gte", " IN " : "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
-
+MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
 
 def read_file(file):
@@ -26,25 +24,25 @@ def read_file(file):
     with open(file, "r") as f:
         rows = f.readlines()
 
-        for i,row in enumerate(rows):
-            rows[i]=row.replace("\n","")
-    return(rows)
-    
+        for i, row in enumerate(rows):
+            rows[i] = row.replace("\n", "")
+    return (rows)
+
+
 def read_connection_details(config_file):
-    connection_details=read_file(config_file)
-    db_details={}
+    connection_details = read_file(config_file)
+    db_details = {}
     for detail in connection_details:
-        key=detail.split("=")[0]
-        value=detail.split("=")[1]
-        db_details[key]=value
+        key = detail.split("=")[0]
+        value = detail.split("=")[1]
+        db_details[key] = value
 
         # Skip empty lines to avoid error when reading config file
         if not detail:
             continue
 
-    print(", ".join([db_details['DB_SERVER'],db_details['DB_DATABASE'],db_details['DB_USERNAME']]))
-    return(db_details)
-
+    print(", ".join([db_details['DB_SERVER'], db_details['DB_DATABASE'], db_details['DB_USERNAME']]))
+    return (db_details)
 
 
 def save_migration(function, *args, **kw):  # decorator
@@ -80,7 +78,6 @@ def save_migration(function, *args, **kw):  # decorator
         function(instance, *args, **kw)
 
     return (new_function)
-
 
 
 class Migrator:
@@ -150,7 +147,6 @@ class Migrator:
     def migration_list_to_json(self, filename=None):
         result = json.dumps(self.migration_list)
 
-
         if filename is None or filename == "" or filename.isspace():
             with open("migrations/migration-" + str(self.migration_number) + ".json", "w+") as f:
                 f.write(result)
@@ -159,7 +155,6 @@ class Migrator:
                 f.write(result)
 
     def create_migrations_from_df(self, name, dataframe):
-
 
         columns, return_types = self.extract_columns_and_types_from_df(dataframe)
 
@@ -194,11 +189,11 @@ class AbstractDB(abc.ABC):
     def __init__(self, config_file="config.ini", db_details=None):
         if db_details is None:
             db_details = read_connection_details(config_file)
-            
-        self.locally=True
-        if db_details["LOCALLY"]=="False":
-            self.locally=False  
-        
+
+        self.locally = True
+        if db_details["LOCALLY"] == "False":
+            self.locally = False
+
         self.DB_SERVER = db_details["DB_SERVER"]
         self.DB_DATABASE = db_details["DB_DATABASE"]
         self.DB_USERNAME = db_details["DB_USERNAME"]
@@ -216,7 +211,6 @@ class AbstractDB(abc.ABC):
 
         self.connect_to_db()
 
-
     @abc.abstractmethod
     def connect_locally(self):
         pass
@@ -225,13 +219,11 @@ class AbstractDB(abc.ABC):
     def connect_remotely(self):
         pass
 
-
     def _connect(self):
         if self.locally:
             self.connect_locally()
         else:
             self.connect_remotely()
-
 
     def connect(self):
         print("DEPRECATION WARNING: use `connect_to_db` context manager instead of `connect` method")
@@ -283,10 +275,10 @@ class db(AbstractDB):
 
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
-            r'SERVER=' + self.DB_SERVER + ';'
-            r'DATABASE=' + self.DB_DATABASE + ';'
-            r'UID=' + self.DB_USERNAME + ';'
-            r'PWD=' + self.DB_PASSWORD + '',
+                                           r'SERVER=' + self.DB_SERVER + ';'
+                                                                         r'DATABASE=' + self.DB_DATABASE + ';'
+                                                                                                           r'UID=' + self.DB_USERNAME + ';'
+                                                                                                                                        r'PWD=' + self.DB_PASSWORD + '',
             timeout=1
 
         )
@@ -296,9 +288,9 @@ class db(AbstractDB):
     def connect_locally(self):
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
-            r'SERVER=' + self.DB_SERVER + ';'
-            r'DATABASE=' + self.DB_DATABASE + ';'
-            r'TRUSTED_CONNECTION=yes;',
+                                           r'SERVER=' + self.DB_SERVER + ';'
+                                                                         r'DATABASE=' + self.DB_DATABASE + ';'
+                                                                                                           r'TRUSTED_CONNECTION=yes;',
             timeout=1
             # r'PWD=' + self.DB_PASSWORD + '')
         )
@@ -343,7 +335,6 @@ class db(AbstractDB):
         return (foreign_keys)
 
 
-
 class Mysqldb(AbstractDB):
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
@@ -363,15 +354,14 @@ class Mysqldb(AbstractDB):
 
     def create_new_db(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME,
-                                             password=self.DB_PASSWORD,
-                                             charset="utf8mb4" , cursorclass=MySQLdb.cursors.DictCursor)
+                                          password=self.DB_PASSWORD,
+                                          charset="utf8mb4", cursorclass=MySQLdb.cursors.DictCursor)
 
         with self.connection.cursor() as cursor:
             create_db_command = "CREATE DATABASE " + self.DB_DATABASE
             cursor.execute(create_db_command)
 
         self.connection.commit()
-
 
     def execute(self, query):
 
@@ -396,12 +386,12 @@ class Mysqldb(AbstractDB):
 class PostgresDb(AbstractDBPostgres):
 
     def connect_locally(self):
-        self.connection= psycopg2.connect(
+        self.connection = psycopg2.connect(
             host=self.DB_SERVER,
             database=self.DB_DATABASE,
             user=self.DB_USERNAME,
             password=self.DB_PASSWORD)
-        self.cursor=self.connection.cursor()
+        self.cursor = self.connection.cursor()
 
     def connect_remotely(self):
         self.connection = psycopg2.connect(
@@ -432,20 +422,16 @@ class PostgresDb(AbstractDBPostgres):
         return (table_dict)
 
 
-
-
-
 class BigQueryDb:
-    def __init__(self,credentials_path,project_id):
-        #super().__init__(None,None)
-        self.credentials_path=credentials_path
-        self.project_id=project_id
+    def __init__(self, credentials_path, project_id):
+        # super().__init__(None,None)
+        self.credentials_path = credentials_path
+        self.project_id = project_id
 
-        self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
+        self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
+            "https://www.googleapis.com/auth/cloud-platform"], )
 
-        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id,)
-
-
+        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id, )
 
     def connect_remotely(self):
         print("Connect remotely")
@@ -462,9 +448,7 @@ class BigQueryDb:
 
         return df
 
-    def execute(self,query):
-
-
+    def execute(self, query):
         # query_job = self.client.query(
         #     """
         #     SELECT
@@ -478,32 +462,28 @@ class BigQueryDb:
         #     LIMIT 10"""
         # )
 
-
-
         query_job = self.client.query(query)
-
 
         results = query_job.result()  # Waits for job to complete.
 
         for row in results:
             print(row)
 
-            #print("{} : {} views".format(row.id, row.link,row.title))
-
+            # print("{} : {} views".format(row.id, row.link,row.title))
 
 
 class MongoDb(AbstractDBMongo):
 
     def connect_locally(self):
-        self.connection= pymongo.MongoClient(
+        self.connection = pymongo.MongoClient(
             host=self.DB_SERVER,
             authSource=self.DB_DATABASE,
             username=self.DB_USERNAME,
             password=self.DB_PASSWORD,
             authMechanism='SCRAM-SHA-256'
-            )
+        )
 
-        self.database=self.connection.get_database(self.DB_DATABASE)
+        self.database = self.connection.get_database(self.DB_DATABASE)
         print('Connected locally')
 
     def connect_remotely(self):
@@ -539,7 +519,6 @@ class MongoDb(AbstractDBMongo):
             table_dict[table] = MongoTable.init_all_columns(self, table)
 
         return (table_dict)
-
 
 
 # Tables
@@ -578,7 +557,6 @@ class AbstractSelectable:
                 cleared_rows_list.append(list1)
         return (cleared_rows_list)
 
-
     def select_all(self):
         list1 = self.select("SELECT * FROM " + self.name)
         return (list1)
@@ -601,7 +579,6 @@ class Selectable(AbstractSelectable):  # Tables, views, and results of joins
 
 class MysqlSelectable(AbstractSelectable):
     def select(self, query):
-
         """TODO"""
         print(query)
         self.db1.execute(query)
@@ -618,7 +595,6 @@ class AbstractJoinable(AbstractSelectable):
         join_columns = list(set(self.columns) | set(joinable.columns))
         new_joinable = Joinable(self.db1, join_name, join_columns)
         return (new_joinable)
-
 
 
 class Joinable(Selectable):
@@ -678,14 +654,12 @@ class AbstractTable(AbstractJoinable):
 
         return df_copy
 
-
-    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False, adjust_df=False):
+    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False):
 
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
-        assert len(df.columns)+1==len(self.columns) #+1 because of id column
-
+        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
@@ -701,12 +675,12 @@ class AbstractTable(AbstractJoinable):
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = "NULL"
 
-        rows=df.values.tolist()
-        for i,row in enumerate(rows):
-            for j,record in enumerate(row):
-                if type(record)==str:
-                    rows[i][j]="'"+record+"'"
-        self.insert(rows,batch=batch,try_mode=try_mode, debug_mode=False)
+        rows = df.values.tolist()
+        for i, row in enumerate(rows):
+            for j, record in enumerate(row):
+                if type(record) == str:
+                    rows[i][j] = "'" + record + "'"
+        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False)
 
     def delete(self, where=None):
 
@@ -767,8 +741,7 @@ class PostgresTable(AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-
-    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
@@ -784,7 +757,8 @@ class PostgresTable(AbstractTable):
 
             query += "("
             for j in range(len(rows[k])):
-                if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][j] == "None":  # NaN hodnoty
+                if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
+                    j] == "None":  # NaN hodnoty
                     if "int" in self.types[j + 1]:
 
                         if replace_apostrophes:
@@ -814,9 +788,9 @@ class PostgresTable(AbstractTable):
                 else:
                     query += str(rows[k][j]) + ","
 
-            query=query[:-1]+"),"
-            if k%batch==batch-1 or k==len(rows)-1:
-                query=query[:-1]
+            query = query[:-1] + "),"
+            if k % batch == batch - 1 or k == len(rows) - 1:
+                query = query[:-1]
 
                 if debug_mode:
                     print(query)
@@ -833,9 +807,7 @@ class PostgresTable(AbstractTable):
                         # Write to logs only in debug mode
                         if debug_mode:
                             with open("log.txt", "a") as file:
-                                file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
-
-
+                                file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
 
     @save_migration
     def add_column(self, column_name, column_type):
@@ -883,7 +855,6 @@ class MongoTable():
         print(db)
         self.collection = self.db1.create_table(name)
 
-
     def drop(self):
         return self.collection.drop()
 
@@ -901,6 +872,9 @@ class MongoTable():
         return self.insert_more(documents)
 
     def select(self, query, columns={}):
+
+        if columns == '*':
+            columns = {}
 
         if (len(columns) == 0):
 
@@ -927,7 +901,6 @@ class MongoTable():
 
     def update(self, newvalues, query):
         return self.collection.update_many(query, newvalues)
-
 
     def insert_from_df(self, dataframe):
         dataframe = dataframe.replace({pd.NA: None})
@@ -1029,7 +1002,6 @@ class Table(Joinable, AbstractTable):
         types = temporary_table.get_all_types()
         return (cls(db1, name, columns, types))
 
-
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
@@ -1058,7 +1030,7 @@ class Table(Joinable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
 
         assert len(self.columns) == len(self.types)
         for k in range(len(rows)):
@@ -1094,9 +1066,9 @@ class Table(Joinable, AbstractTable):
                 else:
                     query += str(rows[k][j]) + ","
 
-            query=query[:-1]+"),"
-            if k%batch==batch-1 or k==len(rows)-1:
-                query=query[:-1]
+            query = query[:-1] + "),"
+            if k % batch == batch - 1 or k == len(rows) - 1:
+                query = query[:-1]
 
                 if debug_mode:
                     print(query)
@@ -1115,16 +1087,12 @@ class Table(Joinable, AbstractTable):
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
 
-
-
-
-
-    def get_foreign_keys_for_table(self,table_dict,foreign_keys):
-        #table_dict is in format from db function: generate_table_dict()
-        #foreign_keys are in format from db function: get_foreign_keys_columns()
-        parent_foreign_keys=[]
-        for i,fk in enumerate(foreign_keys):
-            if fk["parent_table"]==self.name:
+    def get_foreign_keys_for_table(self, table_dict, foreign_keys):
+        # table_dict is in format from db function: generate_table_dict()
+        # foreign_keys are in format from db function: get_foreign_keys_columns()
+        parent_foreign_keys = []
+        for i, fk in enumerate(foreign_keys):
+            if fk["parent_table"] == self.name:
 
                 try:
                     print(fk["parent_column_id"])
@@ -1143,7 +1111,6 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
-
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
@@ -1166,18 +1133,17 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def get_all_types(self):
 
-        information_schema_table=Table(self.db1,'INFORMATION_SCHEMA.COLUMNS',['DATA_TYPE'],['nvarchar(50)'])
-        query="SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '"+self.name+"'"
-        types=information_schema_table.select(query)
-        return(types)
-
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        types = information_schema_table.select(query)
+        return (types)
 
     @classmethod
-    def init_all_columns(cls,db1,name):
-        temporary_table=cls(db1,name)
-        columns=temporary_table.get_all_columns()
-        types=temporary_table.get_all_types()
-        return(cls(db1,name,columns,types))
+    def init_all_columns(cls, db1, name):
+        temporary_table = cls(db1, name)
+        columns = temporary_table.get_all_columns()
+        types = temporary_table.get_all_types()
+        return (cls(db1, name, columns, types))
 
     def get_last_id(self):
         """
@@ -1212,7 +1178,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self,rows,batch=1,replace_apostrophes=True,try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
@@ -1228,7 +1194,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
             query += "("
             for j in range(len(rows[k])):
-                if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][j] == "None":  # NaN hodnoty
+                if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
+                    j] == "None":  # NaN hodnoty
                     if "int" in self.types[j + 1]:
 
                         if replace_apostrophes:
@@ -1258,9 +1225,9 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                 else:
                     query += str(rows[k][j]) + ","
 
-            query=query[:-1]+"),"
-            if k%batch==batch-1 or k==len(rows)-1:
-                query=query[:-1]
+            query = query[:-1] + "),"
+            if k % batch == batch - 1 or k == len(rows) - 1:
+                query = query[:-1]
 
                 if debug_mode:
                     print(query)
@@ -1277,12 +1244,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                         # Write to logs only in debug mode
                         if debug_mode:
                             with open("log.txt", "a") as file:
-                                file.write("Query "+str(query)+" could not be inserted:"+str(e)+"\n")
+                                file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
 
-    def add_foreign_key(self,foreign_key):
-        parent_id=foreign_key['parent_id']
-        parent=foreign_key['parent']
-        query="ALTER TABLE "+self.name+" MODIFY "+parent_id+" INT UNSIGNED"
+    def add_foreign_key(self, foreign_key):
+        parent_id = foreign_key['parent_id']
+        parent = foreign_key['parent']
+        query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
         print(query)
         self.db1.execute(query)
         query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "(id)"
@@ -1331,13 +1298,12 @@ class XlsxDB:
     def __init__(self, name="new_db", config_file="config.ini"):
         self.name = name
 
-
         """
         db_details=read_connection_details(config_file)
         locally=True
         if db_details["LOCALLY"]=="False":
             locally=False
-            
+
         if locally:
             self.DB_SERVER=db_details["DB_SERVER"]
             self.DB_DATABASE=db_details["DB_DATABASE"]
@@ -1361,7 +1327,6 @@ class XlsxDB:
         pass
         # self.connection.close()
         # print("DB connection closed")
-
 
     def create_database(self):
         import os
@@ -1390,9 +1355,8 @@ class XlsxTable(AbstractTable):
             df = pd.DataFrame(columns=self.columns)
         return (df)
 
-
-    def insert_from_df(self,df,batch=1,try_mode=False, debug_mode=False):
-        assert len(df.columns)+1==len(self.columns) #+1 because of id column
+    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False):
+        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         original_df = self.select_to_df()
 
