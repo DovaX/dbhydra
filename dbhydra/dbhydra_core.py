@@ -232,6 +232,27 @@ class AbstractDB(abc.ABC):
         else:
             self.connect_remotely()
 
+    #@abc.abstractmethod
+    def get_all_tables(self):
+        pass
+
+    #@abc.abstractmethod
+    def generate_table_dict(self):
+        pass
+
+    def get_table(self, table_name: str):
+        """
+        Retrieves Table from DB using its name.
+        """
+
+        try:
+            table = self.generate_table_dict()[table_name]
+        except KeyError:
+            print(f'Table "{table_name}" was not found in the DB.')
+            raise KeyError
+
+        return table
+
     @contextmanager
     def connect_to_db(self):
         try:
@@ -239,6 +260,13 @@ class AbstractDB(abc.ABC):
             yield None
         finally:
             self.close_connection()
+
+    @contextmanager
+    def connect_to_table(self, table_name):
+        with self.connect_to_db():
+            table = self.generate_table_dict()[table_name]
+
+            yield table
 
     def execute(self, query):
         self.cursor.execute(query)
