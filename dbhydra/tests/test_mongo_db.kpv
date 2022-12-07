@@ -1,0 +1,1 @@
+{"db_details":{'DB_SERVER': 'localhost', 'DB_DATABASE': 'learning-mongo', 'DB_USERNAME': 'Guru99', 'DB_PASSWORD': 'password', 'LOCALLY': True, 'DIALECT': 'MongoDB', 'NEW DB': False}}
