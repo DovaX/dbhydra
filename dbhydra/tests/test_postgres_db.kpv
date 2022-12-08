@@ -1,1 +1,0 @@
-{"db_details":{'DB_SERVER': 'localhost', 'DB_DATABASE': 'postgres', 'DB_USERNAME': '', 'DB_PASSWORD': '', 'LOCALLY': True, 'DIALECT': 'PostgreSQL'}}
