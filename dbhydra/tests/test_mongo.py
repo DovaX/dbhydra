@@ -3,6 +3,9 @@ import dbhydra.dbhydra_core as dh
 import pandas as pd
 import keepvariable.keepvariable_core as kv
 
+import dbhydra.tests.test_cases as test_cases
+
+
 
 db_details_mongo = kv.load_variable_safe("tests/test_mongo_db.kpv", varname="db_details")
 
@@ -39,26 +42,23 @@ def test_mongo_select(db, compare_df, table_name, request):
     assert response_df.equals(compare_df)
 
 
-# @pytest.mark.parametrize(
-#     "db,input_df,compare_df,seq,",
-#     [
-#         ("mysqldb", input_df, compare_df, operation_sequence1),
-#         ("postgresdb", input_df, compare_df, operation_sequence1),
-#     ],
-# )
-#
-# def test_mongo_crud(db, input_df, compare_df, seq, request):
-#     db = request.getfixturevalue(db)
-#     with mongodb.connect_to_db():
-#         tables = mongodb.generate_table_dict()
-#         testing_table = tables['testing_table_insert']
-#         testing_table.insert_from_df(input_df)
-#         seq(testing_table)
-#
-#         response_rows = testing_table.select_all()
-#         testing_table.delete()
-#
-#     resp_df = pd.DataFrame(response_rows, columns=testing_table.columns).astype('object')
-#     resp_df = resp_df.drop(['id'], axis=1)
-#
-#     assert resp_df.equals(compare_df)
+@pytest.mark.parametrize(
+    "db,input_df,compare_df,seq,",
+    [
+        ("mongodb", test_cases.test_case1[0], test_cases.test_case1[1], test_cases.test_case1[2]),
+    ],
+)
+def test_mongo_crud(db, input_df, compare_df, seq, request):
+    db = request.getfixturevalue(db)
+    with db.connect_to_db():
+        tables = db.generate_table_dict()
+        testing_table = tables['testing_table_insert']
+        testing_table.insert_from_df(input_df)
+        seq(testing_table, {'age': 5}, {'name' : 'Lisa'}, {"$set": {"age":100}}, { "age": 144})
+
+        resp_df = testing_table.select_to_df().astype('object')
+        testing_table.delete()
+
+    resp_df = resp_df.drop(['_id'], axis=1)
+
+    assert resp_df.equals(compare_df)

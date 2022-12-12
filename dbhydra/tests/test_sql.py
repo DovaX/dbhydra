@@ -3,6 +3,8 @@ import dbhydra.dbhydra_core as dh
 import pandas as pd
 import keepvariable.keepvariable_core as kv
 
+import dbhydra.tests.test_cases as test_cases
+
 db_details_mysql = kv.load_variable_safe("tests/test_sql_db.kv", varname="db_details")
 db_details_postgres = kv.load_variable_safe(
     "tests/test_postgres_db.kpv", varname="db_details"
@@ -75,38 +77,22 @@ def test_mysql_select(db, table_name, compare_df, request):
     assert response_df.equals(compare_df.reindex(columns=response_df.columns))
 
 
-# TODO: add more testing scenarios
-
-
-def operation_sequence1(testing_table):
-    testing_table.delete(where="age=5")
-    testing_table.delete(where="name='Lisa'")
-    testing_table.update(variable_assign="age=100", where="age=144")
-
-
-input_df = pd.DataFrame(
-    {"name": ["John", "Lisa", "Charlie", "Rachel"], "age": [5, 67, 22, 144]}
-).astype("object")
-compare_df = pd.DataFrame({"name": ["Charlie", "Rachel"], "age": [22, 100]}).astype(
-    "object"
-)
-
 
 @pytest.mark.parametrize(
     "db,input_df,compare_df,seq,",
     [
-        ("mysqldb", input_df, compare_df, operation_sequence1),
-        ("postgresdb", input_df, compare_df, operation_sequence1),
+        ("mysqldb", test_cases.test_case1[0], test_cases.test_case1[1], test_cases.test_case1[2]),
+        ("postgresdb", test_cases.test_case1[0], test_cases.test_case1[1], test_cases.test_case1[2]),
     ],
 )
 def test_mysql_crud(db, input_df, compare_df, seq, request):
     db = request.getfixturevalue(db)
 
-    with db.connect_to_db() as con:
+    with db.connect_to_db():
         tables = db.generate_table_dict()
         testing_table = tables["testing_table_insert"]
         testing_table.insert_from_df(input_df)
-        seq(testing_table)
+        seq(testing_table, "age=5", "name='Lisa'", "age=100", "age=144")
         response_df = testing_table.select_to_df()
         testing_table.delete()
 
