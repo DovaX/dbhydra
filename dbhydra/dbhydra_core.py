@@ -151,7 +151,7 @@ class Migrator:
             with open("migrations/migration-" + str(self.migration_number) + ".json", "w+") as f:
                 f.write(result)
         else:
-            with open(f"{filename}.json", "w+") as f:
+            with open(f"migrations/{filename}.json", "w+") as f:
                 f.write(result)
 
     def create_migrations_from_df(self, name, dataframe):
@@ -170,7 +170,10 @@ class Migrator:
         for column in dataframe:
             t = dataframe.loc[0, column]
             try:
-                return_types.append(type(t.item()).__name__)
+                if pd.isna(t):
+                    return_types.append(type(None).__name__)
+                else:
+                    return_types.append(type(t.item()).__name__)
             except:
                 # length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
                 length = int(dataframe[column].str.len().max())
@@ -1305,7 +1308,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         try:
             print(command)
             self.db1.execute(command)
-            index = self.db1.columns.index(column_name)
+            index = self.columns.index(column_name)
             self.db1.columns.remove(column_name)
             self.db1.types.remove(self.db1.types[index])
         except Exception as e:
