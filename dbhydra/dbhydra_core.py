@@ -4,7 +4,12 @@ import pyodbc
 import pandas as pd
 import numpy as np
 import pymysql as MySQLdb
-import psycopg2
+from sys import platform
+if platform != "linux" and platform != "linux2":
+    # linux
+    import psycopg2 # disable dependency for server (Temporary)
+
+
 import math
 import json
 import ast
