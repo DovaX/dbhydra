@@ -400,7 +400,7 @@ class Mysqldb(AbstractDB):
         self.connection.commit()
 
     def get_all_tables(self):
-        sysobjects_table = Table(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
+        sysobjects_table = MysqlTable(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
         query = "SELECT TABLE_NAME,TABLE_TYPE,TABLE_SCHEMA FROM information_schema.tables where TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='" + self.DB_DATABASE + "' ;"
         rows = sysobjects_table.select(query)
         tables = [x[0] for x in rows]
@@ -442,7 +442,8 @@ class PostgresDb(AbstractDBPostgres):
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
-        return [''.join(i) for i in self.cursor.fetchall()]
+        tables = [''.join(i) for i in self.cursor.fetchall()]
+        return tables
 
     def generate_table_dict(self):
         tables = self.get_all_tables()
@@ -729,19 +730,32 @@ class PostgresTable(AbstractTable):
         self.types = types
         print("==========================================")
 
+    def initialize_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
+        columns = information_schema_table.select(query)
+        self.columns = columns
+
+    def initialize_types(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        types = information_schema_table.select(query)
+        self.types = types
+
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
-        print(columns)
+
         return (columns)
 
     def get_all_types(self):
+
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        print(types)
         return (types)
+
 
     def select_all(self):
         print(super().select_all())
@@ -754,7 +768,7 @@ class PostgresTable(AbstractTable):
         types = temporary_table.get_all_types()
         return (cls(db1, name, columns, types))
 
-    @save_migration
+    # @save_migration
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
@@ -764,10 +778,10 @@ class PostgresTable(AbstractTable):
             query += self.columns[i] + " " + self.types[i] + ","
 
         query = query[:-1]
-        query += ")"
+        query += ");"
         print(query)
         try:
-            self.db1.cursor.execute(query)
+            self.db1.execute(query)
         except Exception as e:
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
@@ -1148,19 +1162,19 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
 
     def initialize_types(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         self.types = types
 
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
 
         return (columns)
@@ -1168,7 +1182,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def get_all_types(self):
 
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         return (types)
 
