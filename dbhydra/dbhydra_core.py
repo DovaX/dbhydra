@@ -400,7 +400,7 @@ class Mysqldb(AbstractDB):
         self.connection.commit()
 
     def get_all_tables(self):
-        sysobjects_table = MysqlTable(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
+        sysobjects_table = Table(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
         query = "SELECT TABLE_NAME,TABLE_TYPE,TABLE_SCHEMA FROM information_schema.tables where TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA='" + self.DB_DATABASE + "' ;"
         rows = sysobjects_table.select(query)
         tables = [x[0] for x in rows]
