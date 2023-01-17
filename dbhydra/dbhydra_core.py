@@ -744,7 +744,7 @@ class PostgresTable(AbstractTable):
 
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
 
         return (columns)
@@ -752,7 +752,7 @@ class PostgresTable(AbstractTable):
     def get_all_types(self):
 
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA TABLE_NAME  = '" + self.name + "'"
+        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         return (types)
 
