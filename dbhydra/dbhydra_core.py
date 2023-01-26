@@ -442,7 +442,7 @@ class PostgresDb(AbstractDBPostgres):
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
-        tables = [''.join(i) for i in self.cursor.fetchall()]
+        tables = [''.join(x) for x in self.cursor.fetchall()]
         return tables
 
     def generate_table_dict(self):
