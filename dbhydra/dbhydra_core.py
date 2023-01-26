@@ -16,7 +16,19 @@ import abc
 from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
-
+POSTGRES_TO_MYSQL_DATA_MAPPING = {
+    "integer": "int",
+    "bigint": "bigint",
+    "smallint": "smallint",
+    "character varying": "varchar",
+    "text": "longtext",
+    "boolean": "tinyint(1)",
+    "double precision": "double",
+    "real": "float",
+    "numeric": "decimal",
+    "date": "date",
+    "timestamp": "timestamp"
+}
 
 def read_file(file):
     """Reads txt file -> list"""
@@ -80,9 +92,14 @@ def save_migration(function, *args, **kw):  # decorator
     return (new_function)
 
 
+# class DataMigrator:
+
+
+
 class Migrator:
-    def __init__(self, db=None):
+    def __init__(self, db=None, db2=None):
         self.db = db
+        self.db2 = db2
         self.migration_number = 1
         self.migration_list = []
 
@@ -92,7 +109,6 @@ class Migrator:
         options = migration_dict[operation]
         if operation == "create":
             if (isinstance(self.db, Mysqldb)):
-
                 table = MysqlTable(self.db, options["table_name"], options["columns"], options["types"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"], options["columns"], options["types"])
@@ -127,6 +143,22 @@ class Migrator:
             table.initialize_columns()
             table.initialize_types()
             table.drop_column(options["column_name"])
+        elif operation == "copy_table_data":
+            if isinstance(self.db, MongoDb):
+                origin_table = MongoTable(self.db, options["table_name"])
+            else:
+                origin_table = origin_table_dict[options["table_name"]]
+            if isinstance(self.db2, MongoDb):
+                destination_table = MongoTable(self.db2, options["table_name"])
+            else:
+                destination_table_dict = self.d2.generate_table_dict()
+                destination_table = destination_table_dict[options["table_name"]]
+            df_to_copy = origin_table.select_to_df()
+            destination_table.delete() #TODO: discuss what to do with duplicate ids (maybe on DUPLICATE KEY UPDATE? )
+            destination_table.insert_from_df(df_to_copy, insert_id=True)
+
+
+
 
     def next_migration(self):
         self.migration_number += 1
@@ -167,7 +199,13 @@ class Migrator:
         columns = list(dataframe.columns)
 
         return_types = []
+
+        if columns == []:
+            return ["id"], ["int"]
         for column in dataframe:
+            if dataframe.empty:
+                return_types.append(type(None).__name__)
+                continue
             t = dataframe.loc[0, column]
             try:
                 if pd.isna(t):
@@ -279,8 +317,8 @@ class AbstractDB(abc.ABC):
         self.connection.close()
         print("DB connection closed")
 
-    def initialize_migrator(self):
-        self.migrator = Migrator(self)
+    def initialize_migrator(self, other_db=None):
+        self.migrator = Migrator(self, other_db)
 
 
 class AbstractDBPostgres(AbstractDB):
@@ -534,7 +572,8 @@ class MongoDb(AbstractDBMongo):
         return self.database.list_collection_names()
 
     def create_table(self, name):
-        return self.database[name]
+        table = self.database[name]
+        return table
 
     def createTable(self, name):
         print("WARNING: `createTable` method will be deprecated in favor of `create_table`")
@@ -686,13 +725,15 @@ class AbstractTable(AbstractJoinable):
 
         return df_copy
 
-    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False):
+    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
 
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
-
+        if insert_id:
+            assert len(df.columns) == len(self.columns)
+        else:
+            assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
                               pd.Float32Dtype(), pd.Float64Dtype()}
@@ -712,7 +753,7 @@ class AbstractTable(AbstractJoinable):
             for j, record in enumerate(row):
                 if type(record) == str:
                     rows[i][j] = "'" + record + "'"
-        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False)
+        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
 
     def delete(self, where=None):
 
@@ -795,14 +836,15 @@ class PostgresTable(AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
+        start_index = 0 if insert_id else 1
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
-                for i in range(1, len(self.columns)):
+                for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
@@ -813,28 +855,28 @@ class PostgresTable(AbstractTable):
             for j in range(len(rows[k])):
                 if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
                     j] == "None":  # NaN hodnoty
-                    if "int" in self.types[j + 1]:
+                    if "int" in self.types[j + start_index]:
 
                         if replace_apostrophes:
                             rows[k][j] = str(rows[k][j]).replace("'", "")
                         query += "NULL,"
                     else:
                         query += "NULL,"
-                elif "nvarchar" in self.types[j + 1]:
+                elif "nvarchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "N'" + str(rows[k][j]) + "',"
-                elif "varchar" in self.types[j + 1]:
+                elif "varchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif self.types[j + 1] == "int":
+                elif self.types[j + start_index] == "int":
                     query += str(rows[k][j]) + ","
-                elif "datetime" in self.types[j + 1]:
+                elif "datetime" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif "date" in self.types[j + 1]:
+                elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
 
 
@@ -959,7 +1001,9 @@ class MongoTable():
     def update(self, newvalues, query):
         return self.collection.update_many(query, newvalues)
 
-    def insert_from_df(self, dataframe):
+    def insert_from_df(self, dataframe, insert_id=None):
+        if dataframe.empty:
+            return
         dataframe = dataframe.replace({pd.NA: None})
         dict_from_df = dataframe.to_dict('records')
         # dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
@@ -1243,14 +1287,15 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
+        start_index = 0 if insert_id else 1
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
-                for i in range(1, len(self.columns)):
+                for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
@@ -1261,28 +1306,28 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             for j in range(len(rows[k])):
                 if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
                     j] == "None":  # NaN hodnoty
-                    if "int" in self.types[j + 1]:
+                    if "int" in self.types[j + start_index]:
 
                         if replace_apostrophes:
                             rows[k][j] = str(rows[k][j]).replace("'", "")
                         query += "NULL,"
                     else:
                         query += "NULL,"
-                elif "nvarchar" in self.types[j + 1]:
+                elif "nvarchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "N'" + str(rows[k][j]) + "',"
-                elif "varchar" in self.types[j + 1]:
+                elif "varchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif self.types[j + 1] == "int":
+                elif self.types[j + start_index] == "int":
                     query += str(rows[k][j]) + ","
-                elif "datetime" in self.types[j + 1]:
+                elif "datetime" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif "date" in self.types[j + 1]:
+                elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
 
 
