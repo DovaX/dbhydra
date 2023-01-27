@@ -30,6 +30,14 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
     "timestamp": "timestamp"
 }
 
+PYTHON_TO_MYSQL_DATA_MAPPING = {
+    'int': "INT",
+    'float': "DOUBLE",
+    'str': "VARCHAR(255)",
+    'bool': "TINYINT(1)",
+    'datetime': "DATETIME"
+}
+
 def read_file(file):
     """Reads txt file -> list"""
 
@@ -144,19 +152,27 @@ class Migrator:
             table.initialize_types()
             table.drop_column(options["column_name"])
         elif operation == "copy_table_data":
+            sql=True
             if isinstance(self.db, MongoDb):
                 origin_table = MongoTable(self.db, options["table_name"])
+                sql=False
             else:
+                origin_table_dict = self.db.generate_table_dict()
                 origin_table = origin_table_dict[options["table_name"]]
             if isinstance(self.db2, MongoDb):
                 destination_table = MongoTable(self.db2, options["table_name"])
             else:
-                destination_table_dict = self.d2.generate_table_dict()
+                destination_table_dict = self.db2.generate_table_dict()
                 destination_table = destination_table_dict[options["table_name"]]
             df_to_copy = origin_table.select_to_df()
-            destination_table.delete() #TODO: discuss what to do with duplicate ids (maybe on DUPLICATE KEY UPDATE? )
-            destination_table.insert_from_df(df_to_copy, insert_id=True)
-
+            if not sql:
+                try:
+                    df_to_copy = df_to_copy.drop(["_id"], axis=1)
+                except:
+                    pass
+            destination_table.delete()
+            #TODO: discuss what to do with duplicate ids (maybe on DUPLICATE KEY UPDATE? )
+            destination_table.insert_from_df(df_to_copy, insert_id=sql)
 
 
 
@@ -202,16 +218,21 @@ class Migrator:
 
         if columns == []:
             return ["id"], ["int"]
+
         for column in dataframe:
             if dataframe.empty:
                 return_types.append(type(None).__name__)
                 continue
+
             t = dataframe.loc[0, column]
             try:
                 if pd.isna(t):
                     return_types.append(type(None).__name__)
                 else:
-                    return_types.append(type(t.item()).__name__)
+                    try:
+                        return_types.append(type(t.item()).__name__)
+                    except:
+                        return_types.append(type(t).__name__)
             except:
                 # length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
                 length = int(dataframe[column].str.len().max())
@@ -949,6 +970,8 @@ class MongoTable():
         print("==========================================")
         print(type(db))
         print(db)
+        self.columns = columns
+        self.types = types
         self.collection = self.db1.create_table(name)
 
     def create(self):
@@ -1025,6 +1048,11 @@ class MongoTable():
         values = temporary_table.get_columns_types()
         columns = values[0]
         types = values[1]
+        columns[0] = "id"
+        types[0] = "int"
+        types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
+        types_[0] = "int"
+        types = types_
         return (cls(db1, name, columns, types))
 
     def keys_exists(self, element, *keys):
@@ -1069,6 +1097,8 @@ class MongoTable():
         for dict_j in self.collection.find():
             self.print_nested_keys(dict_j, columns, types)
         types = self.get_all_types(types)
+        self.columns = columns
+        self.types = types
         return columns, types
 
     def get_all_types(self, types):
