@@ -152,27 +152,29 @@ class Migrator:
             table.initialize_types()
             table.drop_column(options["column_name"])
         elif operation == "copy_table_data":
-            sql=True
-            if isinstance(self.db, MongoDb):
-                origin_table = MongoTable(self.db, options["table_name"])
-                sql=False
-            else:
-                origin_table_dict = self.db.generate_table_dict()
-                origin_table = origin_table_dict[options["table_name"]]
+            insert_id=True
+
+            origin_table_dict = self.db.generate_table_dict()
+            origin_table = origin_table_dict[options["table_name"]]
+
             if isinstance(self.db2, MongoDb):
                 destination_table = MongoTable(self.db2, options["table_name"])
             else:
                 destination_table_dict = self.db2.generate_table_dict()
                 destination_table = destination_table_dict[options["table_name"]]
+
             df_to_copy = origin_table.select_to_df()
-            if not sql:
-                try:
+
+            if isinstance(origin_table, MongoTable):
+                insert_id = False
+                if "_id" in df_to_copy.columns:
                     df_to_copy = df_to_copy.drop(["_id"], axis=1)
-                except:
-                    pass
+                if "id" in df_to_copy.columns:
+                    df_to_copy = df_to_copy.drop(["id"], axis=1)
             destination_table.delete()
             #TODO: discuss what to do with duplicate ids (maybe on DUPLICATE KEY UPDATE? )
-            destination_table.insert_from_df(df_to_copy, insert_id=sql)
+
+            destination_table.insert_from_df(df_to_copy, insert_id=insert_id)
 
 
 
@@ -650,8 +652,14 @@ class AbstractSelectable:
         return (cleared_rows_list)
 
     def select_all(self):
-        list1 = self.select("SELECT * FROM " + self.name)
+        all_cols_query = ""
+        for col in self.columns:
+            all_cols_query = all_cols_query + col + ","
+        if all_cols_query[-1] == ",":
+            all_cols_query = all_cols_query[:-1]
+        list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
         return (list1)
+
 
     def select_to_df(self):
         rows = self.select_all()
@@ -843,7 +851,7 @@ class PostgresTable(AbstractTable):
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int"
         query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1046,12 +1054,17 @@ class MongoTable():
 
         temporary_table = cls(db1, name)
         values = temporary_table.get_columns_types()
-        columns = values[0]
-        types = values[1]
-        columns[0] = "id"
-        types[0] = "int"
+        columns = values[0][1:]
+        types = values[1][1:]
+
+        if "id" in columns:
+            index = columns.index("id")
+            columns.pop(index)
+            types.pop(index)
+
+        columns.insert(0, "id")
+        types.insert(0, "int")
         types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
-        types_[0] = "int"
         types = types_
         return (cls(db1, name, columns, types))
 
@@ -1148,7 +1161,7 @@ class Table(Joinable, AbstractTable):
     def create(self):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int"
         query = "CREATE TABLE " + self.name + "(id INT IDENTITY(1,1) NOT NULL,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1302,7 +1315,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int"
         query = "CREATE TABLE " + self.name + "(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1330,7 +1343,9 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
-                query = query[:-1] + ") VALUES "
+                if query[-1] == ',':
+                    query = query[:-1]
+                query = query + ") VALUES "
 
             query += "("
             for j in range(len(rows[k])):
@@ -1364,8 +1379,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
                 else:
                     query += str(rows[k][j]) + ","
+            if query[-1] == ",":
+                query = query[:-1]
 
-            query = query[:-1] + "),"
+            query = query + "),"
             if k % batch == batch - 1 or k == len(rows) - 1:
                 query = query[:-1]
 
