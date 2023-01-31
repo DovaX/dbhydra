@@ -16,8 +16,10 @@ import abc
 from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
+
 POSTGRES_TO_MYSQL_DATA_MAPPING = {
     "int": "int",
+    "integer": "int",
     "bigint": "bigint",
     "smallint": "smallint",
     "character varying": "varchar",
@@ -120,7 +122,7 @@ class Migrator:
                 table = MysqlTable(self.db, options["table_name"], options["columns"], options["types"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"], options["columns"], options["types"])
-                table.convert_types_to_mysql()
+            table.convert_types_from_mysql()
             table.create()
         elif operation == "drop":
             if (isinstance(self.db, Mysqldb)):
@@ -135,6 +137,7 @@ class Migrator:
                 table = PostgresTable(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
+            table.convert_types_from_mysql()
             table.add_column(options["column_name"], options["column_type"])
         elif operation == "modify_column":
             if (isinstance(self.db, Mysqldb)):
@@ -143,6 +146,7 @@ class Migrator:
                 table = PostgresTable(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
+            table.convert_types_from_mysql()
             table.modify_column(options["column_name"], options["column_type"])
         elif operation == "drop_column":
             if (isinstance(self.db, Mysqldb)):
@@ -797,7 +801,7 @@ class PostgresTable(AbstractTable):
 
         return (columns)
 
-    def convert_types_to_mysql(self):
+    def convert_types_from_mysql(self):
         inverse_dict_mysql_to_postgres = dict(zip(POSTGRES_TO_MYSQL_DATA_MAPPING.values(), POSTGRES_TO_MYSQL_DATA_MAPPING.keys()))
         postgres_types = list(map(lambda x: inverse_dict_mysql_to_postgres.get(x, x), self.types))
         self.types = postgres_types
@@ -808,6 +812,7 @@ class PostgresTable(AbstractTable):
         query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         only_types = [x[0] for x in types]
+        only_types = [x.lower() for x in only_types]
         lengths = [x[1] for x in types]
 
         mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), only_types))
@@ -842,7 +847,7 @@ class PostgresTable(AbstractTable):
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0].lower() == "int"
+        assert self.types[0].lower() == "int" or self.types[0].lower() == "integer"
         query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1065,6 +1070,7 @@ class MongoTable():
 
         columns.insert(0, "id")
         types.insert(0, "int")
+        types = [x.lower() for x in types]
         types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
         types = types_
         return (cls(db1, name, columns, types))
@@ -1262,6 +1268,9 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
+
+    def convert_types_from_mysql(self):
+        pass
 
     def initialize_types(self):
         # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
