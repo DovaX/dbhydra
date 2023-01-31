@@ -17,12 +17,12 @@ from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 POSTGRES_TO_MYSQL_DATA_MAPPING = {
-    "integer": "int",
+    "int": "int",
     "bigint": "bigint",
     "smallint": "smallint",
     "character varying": "varchar",
     "text": "longtext",
-    "boolean": "tinyint(1)",
+    "boolean": "tinyint",
     "double precision": "double",
     "real": "float",
     "numeric": "decimal",
@@ -31,11 +31,11 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
 }
 
 PYTHON_TO_MYSQL_DATA_MAPPING = {
-    'int': "INT",
-    'float': "DOUBLE",
-    'str': "VARCHAR(255)",
-    'bool': "TINYINT(1)",
-    'datetime': "DATETIME"
+    'int': "int",
+    'float': "double",
+    'str': "varchar(255)",
+    'bool': "tinyint",
+    'datetime': "datetime"
 }
 
 def read_file(file):
@@ -120,6 +120,7 @@ class Migrator:
                 table = MysqlTable(self.db, options["table_name"], options["columns"], options["types"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"], options["columns"], options["types"])
+                table.convert_types_to_mysql()
             table.create()
         elif operation == "drop":
             if (isinstance(self.db, Mysqldb)):
@@ -151,30 +152,6 @@ class Migrator:
             table.initialize_columns()
             table.initialize_types()
             table.drop_column(options["column_name"])
-        elif operation == "copy_table_data":
-            insert_id=True
-
-            origin_table_dict = self.db.generate_table_dict()
-            origin_table = origin_table_dict[options["table_name"]]
-
-            if isinstance(self.db2, MongoDb):
-                destination_table = MongoTable(self.db2, options["table_name"])
-            else:
-                destination_table_dict = self.db2.generate_table_dict()
-                destination_table = destination_table_dict[options["table_name"]]
-
-            df_to_copy = origin_table.select_to_df()
-
-            if isinstance(origin_table, MongoTable):
-                insert_id = False
-                if "_id" in df_to_copy.columns:
-                    df_to_copy = df_to_copy.drop(["_id"], axis=1)
-                if "id" in df_to_copy.columns:
-                    df_to_copy = df_to_copy.drop(["id"], axis=1)
-            destination_table.delete()
-            #TODO: discuss what to do with duplicate ids (maybe on DUPLICATE KEY UPDATE? )
-
-            destination_table.insert_from_df(df_to_copy, insert_id=insert_id)
 
 
 
@@ -798,6 +775,7 @@ class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
+
         print("==========================================")
 
     def initialize_columns(self):
@@ -818,6 +796,11 @@ class PostgresTable(AbstractTable):
         columns = information_schema_table.select(query)
 
         return (columns)
+
+    def convert_types_to_mysql(self):
+        inverse_dict_mysql_to_postgres = dict(zip(POSTGRES_TO_MYSQL_DATA_MAPPING.values(), POSTGRES_TO_MYSQL_DATA_MAPPING.keys()))
+        postgres_types = list(map(lambda x: inverse_dict_mysql_to_postgres.get(x, x), self.types))
+        self.types = postgres_types
 
     def get_all_types(self):
 
@@ -845,6 +828,14 @@ class PostgresTable(AbstractTable):
         temporary_table = cls(db1, name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
+
+        if "id" in columns:
+            id_col_index = columns.index("id")
+            columns.pop(id_col_index)
+            columns.insert(0, "id")
+            types.pop(id_col_index)
+            types.insert(0, "int")
+
         return (cls(db1, name, columns, types))
 
     # @save_migration
@@ -878,7 +869,13 @@ class PostgresTable(AbstractTable):
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
-                query = query[:-1] + ") VALUES "
+                if query[-1] == ',':
+                    query = query[:-1]
+                    query = query + ") VALUES "
+                elif query[-1] == '(':
+                    query = query[:-1]
+                    query = query + " VALUES "
+
 
             query += "("
             for j in range(len(rows[k])):
@@ -912,8 +909,12 @@ class PostgresTable(AbstractTable):
 
                 else:
                     query += str(rows[k][j]) + ","
+            if query[-1] == ",":
+                query = query[:-1]
+            elif query[-1] == '(':
+                query = query + "DEFAULT"
 
-            query = query[:-1] + "),"
+            query = query + "),"
             if k % batch == batch - 1 or k == len(rows) - 1:
                 query = query[:-1]
 
@@ -1295,6 +1296,16 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         temporary_table = cls(db1, name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
+
+        if "id" in columns:
+            id_col_index = columns.index("id")
+            columns.pop(id_col_index)
+            columns.insert(0, "id")
+            types.pop(id_col_index)
+            types.insert(0, "int")
+
+
+
         return (cls(db1, name, columns, types))
 
     def get_last_id(self):
