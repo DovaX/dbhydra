@@ -442,7 +442,8 @@ class PostgresDb(AbstractDBPostgres):
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
-        return [''.join(i) for i in self.cursor.fetchall()]
+        tables = [''.join(x) for x in self.cursor.fetchall()]
+        return tables
 
     def generate_table_dict(self):
         tables = self.get_all_tables()
@@ -729,19 +730,41 @@ class PostgresTable(AbstractTable):
         self.types = types
         print("==========================================")
 
+    def initialize_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        columns = information_schema_table.select(query)
+        self.columns = columns
+
+    def initialize_types(self):
+        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        # query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        # types = information_schema_table.select(query)
+        self.types = self.get_all_types()
+
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
-        print(columns)
+
         return (columns)
 
     def get_all_types(self):
+
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        print(types)
-        return (types)
+        only_types = [x[0] for x in types]
+        lengths = [x[1] for x in types]
+
+        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), only_types))
+
+        for i in range(len(mysql_types)):
+            if lengths[i] is not None:
+                mysql_types[i] = mysql_types[i] + f"({lengths[i]})"
+
+        return (mysql_types)
+
 
     def select_all(self):
         print(super().select_all())
@@ -754,7 +777,7 @@ class PostgresTable(AbstractTable):
         types = temporary_table.get_all_types()
         return (cls(db1, name, columns, types))
 
-    @save_migration
+    # @save_migration
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
@@ -764,10 +787,10 @@ class PostgresTable(AbstractTable):
             query += self.columns[i] + " " + self.types[i] + ","
 
         query = query[:-1]
-        query += ")"
+        query += ");"
         print(query)
         try:
-            self.db1.cursor.execute(query)
+            self.db1.execute(query)
         except Exception as e:
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
@@ -1148,19 +1171,19 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
 
     def initialize_types(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
-        types = information_schema_table.select(query)
-        self.types = types
+        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        # query = f"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        # types = information_schema_table.select(query)
+        self.types = self.get_all_types()
 
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
 
         return (columns)
@@ -1168,9 +1191,17 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def get_all_types(self):
 
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        return (types)
+        only_types = [x[0] for x in types]
+        lengths = [x[1] for x in types]
+
+        for i in range(len(only_types)):
+            if lengths[i] is not None:
+                only_types[i] = only_types[i] + f"({lengths[i]})"
+        return (only_types)
+
+
 
     @classmethod
     def init_all_columns(cls, db1, name):
