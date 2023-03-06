@@ -496,22 +496,22 @@ class PostgresDb(AbstractDBPostgres):
         return (table_dict)
 
 
-class BigQueryDb:
-    def __init__(self, credentials_path, project_id):
+class BigQueryDb(AbstractDB):
+    def __init__(self, credentials_path, project_id, dataset_name):
         # super().__init__(None,None)
         self.credentials_path = credentials_path
         self.project_id = project_id
+        self.dataset = dataset_name
 
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
             "https://www.googleapis.com/auth/cloud-platform"], )
 
-        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id, )
 
     def connect_remotely(self):
-        print("Connect remotely")
+        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id)
 
     def connect_locally(self):
-        print("Connect locally")
+        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id, )
 
     def close_connection(self):
         self.client.close()
@@ -521,6 +521,26 @@ class BigQueryDb:
         df = pd.read_gbq(query=query, project_id=self.project_id, credentials=self.credentials)
 
         return df
+
+    def get_all_tables(self):
+        query = f"""
+        SELECT table_name
+        FROM {self.dataset}.INFORMATION_SCHEMA.TABLES
+        """
+        rows = list(self.client.query(query))
+        table_names = [row[0] for row in rows]
+        return table_names
+
+    def generate_table_dict(self):
+        tables = self.get_all_tables()
+        table_dict = dict()
+        for i, table in enumerate(tables):
+            table_dict[table] = BigQueryTable.init_all_columns(self, table)
+
+        return (table_dict)
+
+
+
 
     def execute(self, query):
         # query_job = self.client.query(
@@ -811,11 +831,11 @@ class PostgresTable(AbstractTable):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        only_types = [x[0] for x in types]
-        only_types = [x.lower() for x in only_types]
+        types = [x[0] for x in types]
+        types = [x.lower() for x in types]
         lengths = [x[1] for x in types]
 
-        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), only_types))
+        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), types))
 
         for i in range(len(mysql_types)):
             if lengths[i] is not None:
@@ -880,6 +900,7 @@ class PostgresTable(AbstractTable):
                 elif query[-1] == '(':
                     query = query[:-1]
                     query = query + " VALUES "
+
 
 
             query += "("
@@ -975,6 +996,27 @@ class PostgresTable(AbstractTable):
             self.types[index] = new_column_type
         except Exception as e:
             print("Cant add column to table.")
+
+class BigQueryTable():
+    def __init__(self, db, name, columns=None, types=None):
+        self.name = name
+        self.db = db
+        self.columns = columns
+        self.types = types
+
+    @classmethod
+    def init_all_columns(cls, db1, name):
+        temporary_table = cls(db1, name)
+        columns,types = temporary_table.get_all_columns_and_types()
+
+        return (cls(db1, name, columns, types))
+
+    def get_all_columns_and_types(self):
+        results = self.db.client.get_table(self.name)
+        column_names = [x.name for x in results.schema ]
+        column_types = [x.field_type for x in results.schema]
+        return column_names, column_types
+
 
 
 class MongoTable():
