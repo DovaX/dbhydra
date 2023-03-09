@@ -511,7 +511,8 @@ class BigQueryDb(AbstractDB):
         self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id)
 
     def connect_locally(self):
-        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id, )
+        print('Cannot connect locally to BQ')
+        raise Exception
 
     def close_connection(self):
         self.client.close()
