@@ -22,6 +22,28 @@ from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
+POSTGRES_TO_MYSQL_DATA_MAPPING = {
+    "int": "int",
+    "integer": "int",
+    "bigint": "bigint",
+    "smallint": "smallint",
+    "character varying": "varchar",
+    "text": "longtext",
+    "boolean": "tinyint",
+    "double precision": "double",
+    "real": "float",
+    "numeric": "decimal",
+    "date": "date",
+    "timestamp": "timestamp"
+}
+
+PYTHON_TO_MYSQL_DATA_MAPPING = {
+    'int': "int",
+    'float': "double",
+    'str': "varchar(255)",
+    'bool': "tinyint",
+    'datetime': "datetime"
+}
 
 def read_file(file):
     """Reads txt file -> list"""
@@ -85,9 +107,14 @@ def save_migration(function, *args, **kw):  # decorator
     return (new_function)
 
 
+# class DataMigrator:
+
+
+
 class Migrator:
-    def __init__(self, db=None):
+    def __init__(self, db=None, db2=None):
         self.db = db
+        self.db2 = db2
         self.migration_number = 1
         self.migration_list = []
 
@@ -97,10 +124,10 @@ class Migrator:
         options = migration_dict[operation]
         if operation == "create":
             if (isinstance(self.db, Mysqldb)):
-
                 table = MysqlTable(self.db, options["table_name"], options["columns"], options["types"])
             elif (isinstance(self.db, PostgresDb)):
                 table = PostgresTable(self.db, options["table_name"], options["columns"], options["types"])
+            table.convert_types_from_mysql()
             table.create()
         elif operation == "drop":
             if (isinstance(self.db, Mysqldb)):
@@ -115,6 +142,7 @@ class Migrator:
                 table = PostgresTable(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
+            table.convert_types_from_mysql()
             table.add_column(options["column_name"], options["column_type"])
         elif operation == "modify_column":
             if (isinstance(self.db, Mysqldb)):
@@ -123,6 +151,7 @@ class Migrator:
                 table = PostgresTable(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
+            table.convert_types_from_mysql()
             table.modify_column(options["column_name"], options["column_type"])
         elif operation == "drop_column":
             if (isinstance(self.db, Mysqldb)):
@@ -132,6 +161,8 @@ class Migrator:
             table.initialize_columns()
             table.initialize_types()
             table.drop_column(options["column_name"])
+
+
 
     def next_migration(self):
         self.migration_number += 1
@@ -156,7 +187,7 @@ class Migrator:
             with open("migrations/migration-" + str(self.migration_number) + ".json", "w+") as f:
                 f.write(result)
         else:
-            with open(f"{filename}.json", "w+") as f:
+            with open(f"migrations/{filename}.json", "w+") as f:
                 f.write(result)
 
     def create_migrations_from_df(self, name, dataframe):
@@ -172,10 +203,24 @@ class Migrator:
         columns = list(dataframe.columns)
 
         return_types = []
+
+        if columns == []:
+            return ["id"], ["int"]
+
         for column in dataframe:
+            if dataframe.empty:
+                return_types.append(type(None).__name__)
+                continue
+
             t = dataframe.loc[0, column]
             try:
-                return_types.append(type(t.item()).__name__)
+                if pd.isna(t):
+                    return_types.append(type(None).__name__)
+                else:
+                    try:
+                        return_types.append(type(t.item()).__name__)
+                    except:
+                        return_types.append(type(t).__name__)
             except:
                 # length = 2**( int(dataframe[col].str.len().max()) - 1).bit_length()
                 length = int(dataframe[column].str.len().max())
@@ -281,8 +326,8 @@ class AbstractDB(abc.ABC):
         self.connection.close()
         print("DB connection closed")
 
-    def initialize_migrator(self):
-        self.migrator = Migrator(self)
+    def initialize_migrator(self, other_db=None):
+        self.migrator = Migrator(self, other_db)
 
 
 class AbstractDBPostgres(AbstractDB):
@@ -444,7 +489,8 @@ class PostgresDb(AbstractDBPostgres):
     def get_all_tables(self):
         self.cursor.execute("""SELECT table_name FROM information_schema.tables
                WHERE table_schema = 'public'""")
-        return [''.join(i) for i in self.cursor.fetchall()]
+        tables = [''.join(x) for x in self.cursor.fetchall()]
+        return tables
 
     def generate_table_dict(self):
         tables = self.get_all_tables()
@@ -455,22 +501,22 @@ class PostgresDb(AbstractDBPostgres):
         return (table_dict)
 
 
-class BigQueryDb:
-    def __init__(self, credentials_path, project_id):
+class BigQueryDb(AbstractDB):
+    def __init__(self, credentials_path, project_id, dataset_name):
         # super().__init__(None,None)
         self.credentials_path = credentials_path
         self.project_id = project_id
+        self.dataset = dataset_name
 
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
             "https://www.googleapis.com/auth/cloud-platform"], )
 
-        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id, )
 
     def connect_remotely(self):
-        print("Connect remotely")
+        self.client = bigquery.Client(credentials=self.credentials, project=self.credentials.project_id)
 
     def connect_locally(self):
-        print("Connect locally")
+        raise Exception("Cannot connect locally to Big Query")
 
     def close_connection(self):
         self.client.close()
@@ -480,6 +526,26 @@ class BigQueryDb:
         df = pd.read_gbq(query=query, project_id=self.project_id, credentials=self.credentials)
 
         return df
+
+    def get_all_tables(self):
+        query = f"""
+        SELECT table_name
+        FROM {self.dataset}.INFORMATION_SCHEMA.TABLES
+        """
+        rows = list(self.client.query(query))
+        table_names = [row[0] for row in rows]
+        return table_names
+
+    def generate_table_dict(self):
+        tables = self.get_all_tables()
+        table_dict = dict()
+        for i, table in enumerate(tables):
+            table_dict[table] = BigQueryTable.init_all_columns(self, table)
+
+        return (table_dict)
+
+
+
 
     def execute(self, query):
         # query_job = self.client.query(
@@ -535,7 +601,8 @@ class MongoDb(AbstractDBMongo):
         return self.database.list_collection_names()
 
     def create_table(self, name):
-        return self.database[name]
+        table = self.database[name]
+        return table
 
     def createTable(self, name):
         print("WARNING: `createTable` method will be deprecated in favor of `create_table`")
@@ -591,8 +658,14 @@ class AbstractSelectable:
         return (cleared_rows_list)
 
     def select_all(self):
-        list1 = self.select("SELECT * FROM " + self.name)
+        all_cols_query = ""
+        for col in self.columns:
+            all_cols_query = all_cols_query + col + ","
+        if all_cols_query[-1] == ",":
+            all_cols_query = all_cols_query[:-1]
+        list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
         return (list1)
+
 
     def select_to_df(self):
         rows = self.select_all()
@@ -687,13 +760,15 @@ class AbstractTable(AbstractJoinable):
 
         return df_copy
 
-    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False):
+    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
 
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
-
+        if insert_id:
+            assert len(df.columns) == len(self.columns)
+        else:
+            assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
                               pd.Float32Dtype(), pd.Float64Dtype()}
@@ -713,7 +788,7 @@ class AbstractTable(AbstractJoinable):
             for j, record in enumerate(row):
                 if type(record) == str:
                     rows[i][j] = "'" + record + "'"
-        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False)
+        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
 
     def delete(self, where=None):
 
@@ -729,21 +804,50 @@ class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
+
         print("==========================================")
+
+    def initialize_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        columns = information_schema_table.select(query)
+        self.columns = columns
+
+    def initialize_types(self):
+        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        # query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        # types = information_schema_table.select(query)
+        self.types = self.get_all_types()
 
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
-        print(columns)
+
         return (columns)
 
+    def convert_types_from_mysql(self):
+        inverse_dict_mysql_to_postgres = dict(zip(POSTGRES_TO_MYSQL_DATA_MAPPING.values(), POSTGRES_TO_MYSQL_DATA_MAPPING.keys()))
+        postgres_types = list(map(lambda x: inverse_dict_mysql_to_postgres.get(x, x), self.types))
+        self.types = postgres_types
+
     def get_all_types(self):
+
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        print(types)
-        return (types)
+        types = [x[0] for x in types]
+        types = [x.lower() for x in types]
+        lengths = [x[1] for x in types]
+
+        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), types))
+
+        for i in range(len(mysql_types)):
+            if lengths[i] is not None:
+                mysql_types[i] = mysql_types[i] + f"({lengths[i]})"
+
+        return (mysql_types)
+
 
     def select_all(self):
         print(super().select_all())
@@ -754,74 +858,94 @@ class PostgresTable(AbstractTable):
         temporary_table = cls(db1, name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
+
+        if "id" in columns:
+            id_col_index = columns.index("id")
+            columns.pop(id_col_index)
+            columns.insert(0, "id")
+            types.pop(id_col_index)
+            types.insert(0, "int")
+
         return (cls(db1, name, columns, types))
 
-    @save_migration
+    # @save_migration
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int" or self.types[0].lower() == "integer"
         query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
 
         query = query[:-1]
-        query += ")"
+        query += ");"
         print(query)
         try:
-            self.db1.cursor.execute(query)
+            self.db1.execute(query)
         except Exception as e:
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
+        start_index = 0 if insert_id else 1
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
-                for i in range(1, len(self.columns)):
+                for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
-                query = query[:-1] + ") VALUES "
+                if query[-1] == ',':
+                    query = query[:-1]
+                    query = query + ") VALUES "
+                elif query[-1] == '(':
+                    query = query[:-1]
+                    query = query + " VALUES "
+
+
 
             query += "("
             for j in range(len(rows[k])):
                 if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
                     j] == "None":  # NaN hodnoty
-                    if "int" in self.types[j + 1]:
+                    if "int" in self.types[j + start_index]:
 
                         if replace_apostrophes:
                             rows[k][j] = str(rows[k][j]).replace("'", "")
                         query += "NULL,"
                     else:
                         query += "NULL,"
-                elif "nvarchar" in self.types[j + 1]:
+                elif "nvarchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "N'" + str(rows[k][j]) + "',"
-                elif "varchar" in self.types[j + 1]:
+                elif "varchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif self.types[j + 1] == "int":
+                elif self.types[j + start_index] == "int":
                     query += str(rows[k][j]) + ","
-                elif "datetime" in self.types[j + 1]:
+                elif "datetime" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif "date" in self.types[j + 1]:
+                elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
 
 
 
                 else:
                     query += str(rows[k][j]) + ","
+            if query[-1] == ",":
+                query = query[:-1]
+            elif query[-1] == '(':
+                query = query + "DEFAULT"
 
-            query = query[:-1] + "),"
+            query = query + "),"
             if k % batch == batch - 1 or k == len(rows) - 1:
                 query = query[:-1]
 
@@ -878,6 +1002,27 @@ class PostgresTable(AbstractTable):
         except Exception as e:
             print("Cant add column to table.")
 
+class BigQueryTable():
+    def __init__(self, db, name, columns=None, types=None):
+        self.name = name
+        self.db = db
+        self.columns = columns
+        self.types = types
+
+    @classmethod
+    def init_all_columns(cls, db1, name):
+        temporary_table = cls(db1, name)
+        columns,types = temporary_table.get_all_columns_and_types()
+
+        return (cls(db1, name, columns, types))
+
+    def get_all_columns_and_types(self):
+        results = self.db.client.get_table(self.name)
+        column_names = [x.name for x in results.schema ]
+        column_types = [x.field_type for x in results.schema]
+        return column_names, column_types
+
+
 
 class MongoTable():
     def __init__(self, db, name, columns=[], types=[]):
@@ -886,6 +1031,8 @@ class MongoTable():
         print("==========================================")
         print(type(db))
         print(db)
+        self.columns = columns
+        self.types = types
         self.collection = self.db1.create_table(name)
 
     def create(self):
@@ -938,7 +1085,9 @@ class MongoTable():
     def update(self, newvalues, query):
         return self.collection.update_many(query, newvalues)
 
-    def insert_from_df(self, dataframe):
+    def insert_from_df(self, dataframe, insert_id=None):
+        if dataframe.empty:
+            return
         dataframe = dataframe.replace({pd.NA: None})
         dict_from_df = dataframe.to_dict('records')
         # dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
@@ -958,8 +1107,19 @@ class MongoTable():
 
         temporary_table = cls(db1, name)
         values = temporary_table.get_columns_types()
-        columns = values[0]
-        types = values[1]
+        columns = values[0][1:]
+        types = values[1][1:]
+
+        if "id" in columns:
+            index = columns.index("id")
+            columns.pop(index)
+            types.pop(index)
+
+        columns.insert(0, "id")
+        types.insert(0, "int")
+        types = [x.lower() for x in types]
+        types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
+        types = types_
         return (cls(db1, name, columns, types))
 
     def keys_exists(self, element, *keys):
@@ -1004,6 +1164,8 @@ class MongoTable():
         for dict_j in self.collection.find():
             self.print_nested_keys(dict_j, columns, types)
         types = self.get_all_types(types)
+        self.columns = columns
+        self.types = types
         return columns, types
 
     def get_all_types(self, types):
@@ -1053,7 +1215,7 @@ class Table(Joinable, AbstractTable):
     def create(self):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int"
         query = "CREATE TABLE " + self.name + "(id INT IDENTITY(1,1) NOT NULL,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1150,19 +1312,22 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
 
+    def convert_types_from_mysql(self):
+        pass
+
     def initialize_types(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
-        types = information_schema_table.select(query)
-        self.types = types
+        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        # query = f"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        # types = information_schema_table.select(query)
+        self.types = self.get_all_types()
 
     def get_all_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
 
         return (columns)
@@ -1170,15 +1335,33 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def get_all_types(self):
 
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        return (types)
+        only_types = [x[0] for x in types]
+        lengths = [x[1] for x in types]
+
+        for i in range(len(only_types)):
+            if lengths[i] is not None:
+                only_types[i] = only_types[i] + f"({lengths[i]})"
+        return (only_types)
+
+
 
     @classmethod
     def init_all_columns(cls, db1, name):
         temporary_table = cls(db1, name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
+
+        if "id" in columns:
+            id_col_index = columns.index("id")
+            columns.pop(id_col_index)
+            columns.insert(0, "id")
+            types.pop(id_col_index)
+            types.insert(0, "int")
+
+
+
         return (cls(db1, name, columns, types))
 
     def get_last_id(self):
@@ -1199,7 +1382,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
-        assert self.types[0] == "int"
+        assert self.types[0].lower() == "int"
         query = "CREATE TABLE " + self.name + "(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
@@ -1214,54 +1397,59 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             print("Table " + self.name + " already exists:", e)
             print("Check the specification of table columns and their types")
 
-    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False):
+    def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
+        start_index = 0 if insert_id else 1
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
-                for i in range(1, len(self.columns)):
+                for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
                         query += self.columns[i] + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
-                query = query[:-1] + ") VALUES "
+                if query[-1] == ',':
+                    query = query[:-1]
+                query = query + ") VALUES "
 
             query += "("
             for j in range(len(rows[k])):
                 if rows[k][j] == "NULL" or rows[k][j] == "'NULL'" or rows[k][j] == None or rows[k][
                     j] == "None":  # NaN hodnoty
-                    if "int" in self.types[j + 1]:
+                    if "int" in self.types[j + start_index]:
 
                         if replace_apostrophes:
                             rows[k][j] = str(rows[k][j]).replace("'", "")
                         query += "NULL,"
                     else:
                         query += "NULL,"
-                elif "nvarchar" in self.types[j + 1]:
+                elif "nvarchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "N'" + str(rows[k][j]) + "',"
-                elif "varchar" in self.types[j + 1]:
+                elif "varchar" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif self.types[j + 1] == "int":
+                elif self.types[j + start_index] == "int":
                     query += str(rows[k][j]) + ","
-                elif "datetime" in self.types[j + 1]:
+                elif "datetime" in self.types[j + start_index]:
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
-                elif "date" in self.types[j + 1]:
+                elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
 
 
 
                 else:
                     query += str(rows[k][j]) + ","
+            if query[-1] == ",":
+                query = query[:-1]
 
-            query = query[:-1] + "),"
+            query = query + "),"
             if k % batch == batch - 1 or k == len(rows) - 1:
                 query = query[:-1]
 
@@ -1310,7 +1498,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         try:
             print(command)
             self.db1.execute(command)
-            index = self.db1.columns.index(column_name)
+            index = self.columns.index(column_name)
             self.db1.columns.remove(column_name)
             self.db1.types.remove(self.db1.types[index])
         except Exception as e:
