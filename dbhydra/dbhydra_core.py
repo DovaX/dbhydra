@@ -1373,6 +1373,15 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
         return last_id[0][0]
 
+    def get_num_of_records(self):
+        """
+        Returns the number of records in table
+        """
+
+        num_of_records = self.select(f"SELECT COUNT(*) FROM {self.name};")
+
+        return num_of_records[0][0]
+
     def drop(self):
         query = "DROP TABLE " + self.name + ";"
         print(query)
