@@ -96,7 +96,7 @@ def save_migration(function, *args, **kw):  # decorator
 
         migrator = instance.db1.migrator
         migrator.migration_list.append(migration_dict)
-        migrator.migration_list_to_json()
+        # migrator.migration_list_to_json()
         function(instance, *args, **kw)
 
     return (new_function)
@@ -1273,9 +1273,6 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         pass
 
     def initialize_types(self):
-        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        # query = f"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
-        # types = information_schema_table.select(query)
         self.types = self.get_all_types()
 
     def get_all_columns(self):
@@ -1287,17 +1284,41 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def get_all_types(self):
 
+        only_types, lengths = self.get_types_and_lengths()
+        for i in range(len(only_types)):
+            if lengths[i] is not None:
+                only_types[i] = only_types[i] + f"({lengths[i]})"
+        return (only_types)
+
+    def get_types_and_lengths(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         only_types = [x[0] for x in types]
         lengths = [x[1] for x in types]
 
-        for i in range(len(only_types)):
-            if lengths[i] is not None:
-                only_types[i] = only_types[i] + f"({lengths[i]})"
-        return (only_types)
+        return only_types,lengths
 
+    def get_converted_python_types(self):
+        SQL_TO_PYTHON = {v: k for k, v in PYTHON_TO_MYSQL_DATA_MAPPING.items()}
+        python_types = []
+        for type in self.types:
+            if "varchar" in type:
+                python_types.append("str")
+            elif "nvarchar" in type:
+                python_types.append("str")
+            elif type in SQL_TO_PYTHON:
+                python_types.append(SQL_TO_PYTHON[type])
+            else:
+                raise Exception("Unsupported type")
+
+        return python_types
+
+    def get_nullable_columns(self):
+        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = '{self.name}' and IS_NULLABLE = 'YES'"
+        nullable_columns = information_schema_table.select(query)
+        return (nullable_columns)
 
 
     @classmethod
