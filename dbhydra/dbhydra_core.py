@@ -107,9 +107,8 @@ def save_migration(function, *args, **kw):  # decorator
 
 
 class Migrator:
-    def __init__(self, db=None, db2=None):
+    def __init__(self, db=None):
         self.db = db
-        self.db2 = db2
         self.migration_number = 1
         self.migration_list = []
 
@@ -321,8 +320,8 @@ class AbstractDB(abc.ABC):
         self.connection.close()
         print("DB connection closed")
 
-    def initialize_migrator(self, other_db=None):
-        self.migrator = Migrator(self, other_db)
+    def initialize_migrator(self):
+        self.migrator = Migrator(self)
 
 
 class AbstractDBPostgres(AbstractDB):
@@ -497,11 +496,15 @@ class PostgresDb(AbstractDBPostgres):
 
 
 class BigQueryDb(AbstractDB):
-    def __init__(self, credentials_path, project_id, dataset_name):
+    def __init__(self, db_details):
         # super().__init__(None,None)
-        self.credentials_path = credentials_path
-        self.project_id = project_id
-        self.dataset = dataset_name
+        self.credentials_path = db_details["DB_SERVER"]
+        # self.project_id = project_id
+        self.dataset = db_details["DB_DATABASE"]
+
+        self.locally = True
+        if db_details["LOCALLY"] == "False":
+            self.locally = False
 
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
             "https://www.googleapis.com/auth/cloud-platform"], )
@@ -997,10 +1000,10 @@ class PostgresTable(AbstractTable):
         except Exception as e:
             print("Cant add column to table.")
 
-class BigQueryTable():
-    def __init__(self, db, name, columns=None, types=None):
+class BigQueryTable(AbstractSelectable):
+    def __init__(self, db1, name, columns=None, types=None):
         self.name = name
-        self.db = db
+        self.db1 = db1
         self.columns = columns
         self.types = types
 
@@ -1012,10 +1015,41 @@ class BigQueryTable():
         return (cls(db1, name, columns, types))
 
     def get_all_columns_and_types(self):
-        results = self.db.client.get_table(self.name)
+        results = self.db1.client.get_table(f"{self.db1.credentials.project_id}.{self.db1.dataset}.{self.name}")
         column_names = [x.name for x in results.schema ]
         column_types = [x.field_type for x in results.schema]
         return column_names, column_types
+
+
+    def select(self, query):
+
+        """given SELECT query returns Python list"""
+        """Columns give the number of selected columns"""
+        print(query)
+        rows =  self.db1.client.query(query).result()
+        return rows
+        # column_string = query.lower().split("from")[0]
+        # if "*" in column_string:
+        #     columns = len(self.columns)
+        # elif column_string.find(",") == -1:
+        #     columns = 1
+        # else:
+        #     columns = len(column_string.split(","))
+        # rows = self.db1.cursor.fetchall()
+        # print(rows)
+        # if columns == 1:
+        #     cleared_rows_list = [item[0] for item in rows]
+        #
+        # if columns > 1:
+        #     cleared_rows_list = []
+        #     for row in rows:  # Because of unhashable type: 'pyodbc.Row'
+        #         list1 = []
+        #
+        #         for i in range(columns):
+        #             # print(row)
+        #             list1.append(row[i])
+        #         cleared_rows_list.append(list1)
+        # return (cleared_rows_list)
 
 
 
