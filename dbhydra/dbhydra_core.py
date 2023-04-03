@@ -789,9 +789,6 @@ class PostgresTable(AbstractTable):
         self.columns = columns
 
     def initialize_types(self):
-        # information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        # query = f"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
-        # types = information_schema_table.select(query)
         self.types = self.get_all_types()
 
     def get_all_columns(self):
@@ -1284,13 +1281,13 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def get_all_types(self):
 
-        only_types, lengths = self.get_types_and_lengths()
+        only_types, lengths = self.get_data_types_and_cahracter_lenghts()
         for i in range(len(only_types)):
             if lengths[i] is not None:
                 only_types[i] = only_types[i] + f"({lengths[i]})"
         return (only_types)
 
-    def get_types_and_lengths(self):
+    def get_data_types_and_cahracter_lenghts(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
@@ -1303,9 +1300,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         SQL_TO_PYTHON = {v: k for k, v in PYTHON_TO_MYSQL_DATA_MAPPING.items()}
         python_types = []
         for type in self.types:
-            if "varchar" in type:
-                python_types.append("str")
-            elif "nvarchar" in type:
+            if "varchar" in type or 'nvarchar' in type:
                 python_types.append("str")
             elif type in SQL_TO_PYTHON:
                 python_types.append(SQL_TO_PYTHON[type])
