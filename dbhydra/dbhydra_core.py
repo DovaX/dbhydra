@@ -497,9 +497,7 @@ class PostgresDb(AbstractDBPostgres):
 
 class BigQueryDb(AbstractDB):
     def __init__(self, db_details):
-        # super().__init__(None,None)
         self.credentials_path = db_details["DB_SERVER"]
-        # self.project_id = project_id
         self.dataset = db_details["DB_DATABASE"]
 
 
