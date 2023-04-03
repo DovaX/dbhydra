@@ -1300,7 +1300,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         SQL_TO_PYTHON = {v: k for k, v in PYTHON_TO_MYSQL_DATA_MAPPING.items()}
         python_types = []
         for type in self.types:
-            if "varchar" in type or 'nvarchar' in type:
+            if "varchar" in type:
                 python_types.append("str")
             elif type in SQL_TO_PYTHON:
                 python_types.append(SQL_TO_PYTHON[type])
