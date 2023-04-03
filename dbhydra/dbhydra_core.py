@@ -502,9 +502,8 @@ class BigQueryDb(AbstractDB):
         # self.project_id = project_id
         self.dataset = db_details["DB_DATABASE"]
 
-        self.locally = True
-        if db_details["LOCALLY"] == "False":
-            self.locally = False
+
+        self.locally = False
 
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
             "https://www.googleapis.com/auth/cloud-platform"], )
@@ -515,6 +514,7 @@ class BigQueryDb(AbstractDB):
 
     def connect_locally(self):
         raise Exception("Cannot connect locally to Big Query")
+
 
     def close_connection(self):
         self.client.close()
@@ -546,27 +546,9 @@ class BigQueryDb(AbstractDB):
 
 
     def execute(self, query):
-        # query_job = self.client.query(
-        #     """
-        #     SELECT
-        #       CONCAT(
-        #         'https://stackoverflow.com/questions/',
-        #         CAST(id as STRING)) as url,
-        #       view_count
-        #     FROM `bigquery-public-data.stackoverflow.posts_questions`
-        #     WHERE tags like '%google-bigquery%'
-        #     ORDER BY view_count DESC
-        #     LIMIT 10"""
-        # )
-
         query_job = self.client.query(query)
-
         results = query_job.result()  # Waits for job to complete.
-
-        for row in results:
-            print(row)
-
-            # print("{} : {} views".format(row.id, row.link,row.title))
+        return results
 
 
 class MongoDb(AbstractDBMongo):
@@ -1026,30 +1008,10 @@ class BigQueryTable(AbstractSelectable):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         print(query)
-        rows =  self.db1.client.query(query).result()
+        # rows =  self.db1.client.query(query).result()
+        rows = self.db1.execute(query)
         return rows
-        # column_string = query.lower().split("from")[0]
-        # if "*" in column_string:
-        #     columns = len(self.columns)
-        # elif column_string.find(",") == -1:
-        #     columns = 1
-        # else:
-        #     columns = len(column_string.split(","))
-        # rows = self.db1.cursor.fetchall()
-        # print(rows)
-        # if columns == 1:
-        #     cleared_rows_list = [item[0] for item in rows]
-        #
-        # if columns > 1:
-        #     cleared_rows_list = []
-        #     for row in rows:  # Because of unhashable type: 'pyodbc.Row'
-        #         list1 = []
-        #
-        #         for i in range(columns):
-        #             # print(row)
-        #             list1.append(row[i])
-        #         cleared_rows_list.append(list1)
-        # return (cleared_rows_list)
+
 
 
 
