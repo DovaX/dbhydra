@@ -808,15 +808,14 @@ class PostgresTable(AbstractTable):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        only_types = [x[0] for x in types]
-        only_types = [x.lower() for x in only_types]
-        lengths = [x[1] for x in types]
+        data_types = [x[0].lower() for x in types]
+        date_lengths = [x[1] for x in types]
 
-        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), only_types))
+        mysql_types = list(map(lambda x: POSTGRES_TO_MYSQL_DATA_MAPPING.get(x, x), data_types))
 
         for i in range(len(mysql_types)):
-            if lengths[i] is not None:
-                mysql_types[i] = mysql_types[i] + f"({lengths[i]})"
+            if date_lengths[i] is not None:
+                mysql_types[i] = mysql_types[i] + f"({date_lengths[i]})"
 
         return (mysql_types)
 
@@ -1281,20 +1280,20 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def get_all_types(self):
 
-        only_types, lengths = self.get_data_types_and_cahracter_lenghts()
-        for i in range(len(only_types)):
-            if lengths[i] is not None:
-                only_types[i] = only_types[i] + f"({lengths[i]})"
-        return (only_types)
+        data_types, data_lengths = self.get_data_types_and_character_lengths()
+        for i in range(len(data_types)):
+            if data_lengths[i] is not None:
+                data_types[i] = data_types[i] + f"({data_lengths[i]})"
+        return (data_types)
 
-    def get_data_types_and_cahracter_lenghts(self):
+    def get_data_types_and_character_lengths(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
-        only_types = [x[0] for x in types]
-        lengths = [x[1] for x in types]
+        data_types = [x[0] for x in types]
+        data_lengths = [x[1] for x in types]
 
-        return only_types,lengths
+        return data_types,data_lengths
 
     def get_converted_python_types(self):
         SQL_TO_PYTHON = {v: k for k, v in PYTHON_TO_MYSQL_DATA_MAPPING.items()}
