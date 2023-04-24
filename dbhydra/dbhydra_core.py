@@ -1286,6 +1286,13 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                 data_types[i] = data_types[i] + f"({data_lengths[i]})"
         return (data_types)
 
+
+    """
+        Returns a list of data types, where each element represents the category of the data ('varchar', 'int', etc.). 
+        If a data type has an associated length, the length value will be included in a corresponding element of the
+        data_lengths list, otherwise the element will have a None value. For example, 'varchar(255)' would return
+        'varchar' in the data_types list and 255 in the data_lengths list.
+    """
     def get_data_types_and_character_lengths(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
