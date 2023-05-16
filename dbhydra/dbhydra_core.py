@@ -236,6 +236,27 @@ class Migrator:
 
 
 class AbstractDB(abc.ABC):
+    typing_to_python_mapping = {
+        'List': 'list',
+        'Dict': 'dict',
+        'Tuple': 'tuple',
+        'Set': 'set',
+        'Union': 'object',
+        'Optional': 'object',
+        # 'FrozenSet': frozenset,
+        # 'Deque': list,
+        # 'Any': object,
+        #
+        # 'Callable': object,
+        # 'Type': type,
+        # 'TypeVar': object,
+        # 'Generic': object,
+        # 'Sequence': list,
+        # 'Iterable': list,
+        # 'Mapping': dict,
+        # 'AbstractSet': set,
+    }
+    python_database_type_mapping = {}
     def __init__(self, config_file="config.ini", db_details=None):
         if db_details is None:
             db_details = read_connection_details(config_file)
@@ -329,6 +350,12 @@ class AbstractDB(abc.ABC):
     def initialize_migrator(self, other_db=None):
         self.migrator = Migrator(self, other_db)
 
+    def _convert_column_type_dict_from_python(self, column_type_dict):
+        typing_python_mapping = {k: self.typing_to_python_mapping.get(v, v) for k, v in column_type_dict.items()}
+        return {k: self.python_database_type_mapping[v] for k, v in typing_python_mapping.items()}
+
+
+
 
 class AbstractDBPostgres(AbstractDB):
     # TODO: Config_mongo.ini in postgres?
@@ -414,6 +441,18 @@ class db(AbstractDB):
 
 
 class Mysqldb(AbstractDB):
+
+    python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
+    {
+    'int': "int",
+    'float': "double",
+    'str': "varchar(255)",
+    'list': "varchar(255)",
+    'dict': "varchar(255)",
+    'bool': "tinyint",
+    'datetime': "datetime"
+    }
+
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
@@ -1309,6 +1348,13 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
+
+    @classmethod
+    def init_from_column_type_dict(cls, db1, name, column_type_dict):
+        column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
+        columns = list(column_converted_type_dict.keys())
+        types = list(column_converted_type_dict.values())
+        return cls(db1, name, columns, types)
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
