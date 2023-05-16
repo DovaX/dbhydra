@@ -351,8 +351,12 @@ class AbstractDB(abc.ABC):
         self.migrator = Migrator(self, other_db)
 
     def _convert_column_type_dict_from_python(self, column_type_dict):
-        typing_python_mapping = {k: self.typing_to_python_mapping.get(v, v) for k, v in column_type_dict.items()}
-        return {k: self.python_database_type_mapping[v] for k, v in typing_python_mapping.items()}
+        """
+        First apply mapping from python typing module to standard python.
+        Then apply mapping from python to database types
+        """
+        typing_python_mapping = {column_name: self.typing_to_python_mapping.get(column_type,column_type) for column_name, column_type in column_type_dict.items()}
+        return {column_name: self.python_database_type_mapping[column_type] for column_name, column_type in typing_python_mapping.items()}
 
 
 
