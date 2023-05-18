@@ -1713,3 +1713,17 @@ def df_to_dict(df, column1, column2):
 def dict_to_df(dictionary, column1, column2):
     df = pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
     return (df)
+
+from pydantic import BaseModel
+from typing import List, Dict
+
+class AbstractModel(abc.ABC, BaseModel):
+    pass
+
+class DbTableModel(AbstractModel):
+    uid: int
+    name: str=""
+    columns: List[Dict[str,str]]=[{"name":"","type":"","db_key":""}]
+    is_rolled: bool = False
+    database_uid: str="0"
+    project_uid:str="0"
