@@ -112,9 +112,8 @@ def save_migration(function, *args, **kw):  # decorator
 
 
 class Migrator:
-    def __init__(self, db=None, db2=None):
+    def __init__(self, db=None):
         self.db = db
-        self.db2 = db2
         self.migration_number = 1
         self.migration_list = []
 
@@ -347,8 +346,8 @@ class AbstractDB(abc.ABC):
         self.connection.close()
         print("DB connection closed")
 
-    def initialize_migrator(self, other_db=None):
-        self.migrator = Migrator(self, other_db)
+    def initialize_migrator(self):
+        self.migrator = Migrator(self)
 
     def _convert_column_type_dict_from_python(self, column_type_dict):
         """
@@ -545,11 +544,12 @@ class PostgresDb(AbstractDBPostgres):
 
 
 class BigQueryDb(AbstractDB):
-    def __init__(self, credentials_path, project_id, dataset_name):
-        # super().__init__(None,None)
-        self.credentials_path = credentials_path
-        self.project_id = project_id
-        self.dataset = dataset_name
+    def __init__(self, db_details):
+        self.credentials_path = db_details["DB_SERVER"]
+        self.dataset = db_details["DB_DATABASE"]
+
+
+        self.locally = False
 
         self.credentials = service_account.Credentials.from_service_account_file(self.credentials_path, scopes=[
             "https://www.googleapis.com/auth/cloud-platform"], )
@@ -560,6 +560,7 @@ class BigQueryDb(AbstractDB):
 
     def connect_locally(self):
         raise Exception("Cannot connect locally to Big Query")
+
 
     def close_connection(self):
         self.client.close()
@@ -591,27 +592,9 @@ class BigQueryDb(AbstractDB):
 
 
     def execute(self, query):
-        # query_job = self.client.query(
-        #     """
-        #     SELECT
-        #       CONCAT(
-        #         'https://stackoverflow.com/questions/',
-        #         CAST(id as STRING)) as url,
-        #       view_count
-        #     FROM `bigquery-public-data.stackoverflow.posts_questions`
-        #     WHERE tags like '%google-bigquery%'
-        #     ORDER BY view_count DESC
-        #     LIMIT 10"""
-        # )
-
         query_job = self.client.query(query)
-
         results = query_job.result()  # Waits for job to complete.
-
-        for row in results:
-            print(row)
-
-            # print("{} : {} views".format(row.id, row.link,row.title))
+        return results
 
 
 class MongoDb(AbstractDBMongo):
@@ -1065,10 +1048,10 @@ class PostgresTable(AbstractTable):
         except Exception as e:
             print("Cant add column to table.")
 
-class BigQueryTable():
-    def __init__(self, db, name, columns=None, types=None):
+class BigQueryTable(AbstractSelectable):
+    def __init__(self, db1, name, columns=None, types=None):
         self.name = name
-        self.db = db
+        self.db1 = db1
         self.columns = columns
         self.types = types
 
@@ -1080,10 +1063,21 @@ class BigQueryTable():
         return (cls(db1, name, columns, types))
 
     def get_all_columns_and_types(self):
-        results = self.db.client.get_table(self.name)
+        results = self.db1.client.get_table(f"{self.db1.credentials.project_id}.{self.db1.dataset}.{self.name}")
         column_names = [x.name for x in results.schema ]
         column_types = [x.field_type for x in results.schema]
         return column_names, column_types
+
+
+    def select(self, query):
+
+        """given SELECT query returns Python list"""
+        """Columns give the number of selected columns"""
+        print(query)
+        # rows =  self.db1.client.query(query).result()
+        rows = self.db1.execute(query)
+        return rows
+
 
 
 
