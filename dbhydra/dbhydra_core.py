@@ -810,8 +810,16 @@ class AbstractTable(AbstractJoinable):
 
         if insert_id:
             assert len(df.columns) == len(self.columns)
+            assert set(df.columns) == set(self.columns)
         else:
             assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
+            sql_columns = set(self.columns)
+            sql_columns.remove('id')
+            assert set(df.columns) == sql_columns
+
+        df = df[self.columns]
+
+
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
                               pd.Float32Dtype(), pd.Float64Dtype()}
@@ -832,6 +840,18 @@ class AbstractTable(AbstractJoinable):
                 if type(record) == str:
                     rows[i][j] = "'" + record + "'"
         self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
+
+    #TODO: need to solve inserting in different column_order
+    #check df column names, permute if needed
+    def insert_from_column_value_dict(self, dict, insert_id=False):
+        df = pd.DataFrame(dict, index=[0])
+        self.insert_from_df(df, insert_id=insert_id)
+
+    def insert_from_column_value_dict_list(self, list, insert_id=False):
+        df = pd.DataFrame(list)
+        self.insert_from_df(df, insert_id=insert_id)
+
+
 
     def delete(self, where=None):
 
@@ -1727,12 +1747,20 @@ from pydantic import BaseModel
 from typing import List, Dict
 
 class AbstractModel(abc.ABC, BaseModel):
-    pass
+    def generate_dbhydra_table(self, db1, name):
+        structure_dict = create_table_structure_dict(self)
+        #TODO: what type of table, TEST
+        dbhydra_table = MysqlTable(db1, name, list(structure_dict.keys()), list(structure_dict.values()))
+        return dbhydra_table
 
-class DbTableModel(AbstractModel):
-    uid: int
-    name: str=""
-    columns: List[Dict[str,str]]=[{"name":"","type":"","db_key":""}]
-    is_rolled: bool = False
-    database_uid: str="0"
-    project_uid:str="0"
+
+
+def create_table_structure_dict(api_class_instance):
+    """
+    Accepts instance of API data class (e.g. APIDatabase) and converts it to dictionary {attribute_name: attribute_type}
+    """
+    table_structure_dict = {"id": "int"}
+    table_structure_dict = {**table_structure_dict,
+                            **{attribute_name: attribute_type.__name__ for attribute_name, attribute_type in api_class_instance.__annotations__.items()}}
+
+    return table_structure_dict
