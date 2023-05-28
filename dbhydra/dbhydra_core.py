@@ -114,6 +114,8 @@ def save_migration(function, *args, **kw):  # decorator
 
 # class DataMigrator:
 
+class DbHydraException(Exception):
+    """Raise for db_hydra specific exceptions such as 'pyodbc can't be used on macOS as it's not supported'."""
 
 
 class Migrator:
@@ -386,8 +388,7 @@ class AbstractDBMongo(AbstractDB):
 class db(AbstractDB):
     def connect_remotely(self):
         if sys.platform == "darwin":
-            print("pyodbc library (MSSQL) not supported on macOS.")
-            return
+            raise DbHydraException("pyodbc library (MSSQL) not supported on macOS.")
 
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
@@ -403,8 +404,7 @@ class db(AbstractDB):
 
     def connect_locally(self):
         if sys.platform == "darwin":
-            print("pyodbc library (MSSQL) not supported on macOS.")
-            return
+            raise DbHydraException("pyodbc library (MSSQL) not supported on macOS.")
         
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
