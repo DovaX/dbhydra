@@ -1,6 +1,11 @@
 """DB Hydra ORM"""
+import sys
 import pymongo
-import pyodbc
+
+#! Disabled on macOS --> problematic import
+if sys.platform != "darwin":
+    import pyodbc
+    
 import pandas as pd
 import numpy as np
 import pymysql as MySQLdb
@@ -380,6 +385,9 @@ class AbstractDBMongo(AbstractDB):
 # AWFUL NAME, SHOULD BE RENAMED WITH MAJOR RELEASE (This connects basic SQL i suppose)
 class db(AbstractDB):
     def connect_remotely(self):
+        if sys.platform == "darwin":
+            print("pyodbc library (MSSQL) not supported on macOS.")
+            return
 
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
@@ -394,6 +402,10 @@ class db(AbstractDB):
         print("DB connection established")
 
     def connect_locally(self):
+        if sys.platform == "darwin":
+            print("pyodbc library (MSSQL) not supported on macOS.")
+            return
+        
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
                                            r'SERVER=' + self.DB_SERVER + ';'
