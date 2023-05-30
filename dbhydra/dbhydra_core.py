@@ -34,7 +34,7 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
     "smallint": "smallint",
     "character varying": "varchar",
     "text": "longtext",
-    "boolean": "tinyint",
+    "boolean": "bit",
     "double precision": "double",
     "real": "float",
     "numeric": "decimal",
@@ -46,7 +46,7 @@ PYTHON_TO_MYSQL_DATA_MAPPING = {
     'int': "int",
     'float': "double",
     'str': "varchar(255)",
-    'bool': "tinyint",
+    'bool': "bit",
     'datetime': "datetime"
 }
 
@@ -461,10 +461,10 @@ class Mysqldb(AbstractDB):
     {
     'int': "int",
     'float': "double",
-    'str': "varchar(255)",
-    'list': "varchar(255)",
-    'dict': "varchar(255)",
-    'bool': "tinyint",
+    'str': "nvarchar(255)",
+    'list': "nvarchar(255)",
+    'dict': "nvarchar(255)",
+    'bool': "bit",
     'datetime': "datetime"
     }
 
@@ -806,14 +806,20 @@ class AbstractTable(AbstractJoinable):
         if insert_id:
             assert len(df.columns) == len(self.columns)
             assert set(df.columns) == set(self.columns)
+            
+            inserted_columns=self.columns
+            
         else:
             assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
-            sql_columns = set(self.columns)
-            sql_columns.remove('id')
-            assert set(df.columns) == sql_columns
-
-        df = df[self.columns]
-
+            
+            inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
+            id_index=inserted_columns.index("id")
+            inserted_columns.pop(id_index)
+            print(inserted_columns,df.columns)
+            
+            assert set(df.columns) == set(inserted_columns) #elements are matchin
+            #df = df[inserted_columns]
+        df = df[inserted_columns]
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
@@ -829,11 +835,13 @@ class AbstractTable(AbstractJoinable):
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = "NULL"
 
+        # rows = df.values.tolist()
+        # for i, row in enumerate(rows):
+        #     for j, record in enumerate(row):
+        #         if type(record) == str:
+        #             rows[i][j] = "'" + record + "'"
+        #print(rows)
         rows = df.values.tolist()
-        for i, row in enumerate(rows):
-            for j, record in enumerate(row):
-                if type(record) == str:
-                    rows[i][j] = "'" + record + "'"
         self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
 
     #TODO: need to solve inserting in different column_order
@@ -854,7 +862,6 @@ class AbstractTable(AbstractJoinable):
             query = "DELETE FROM " + self.name
         else:
             query = "DELETE FROM " + self.name + " WHERE " + where
-        print(query)
         self.db1.execute(query)
 
 
