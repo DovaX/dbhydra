@@ -1,6 +1,11 @@
 """DB Hydra ORM"""
+import sys
 import pymongo
-import pyodbc
+
+#! Disabled on macOS --> problematic import
+if sys.platform != "darwin":
+    import pyodbc
+    
 import pandas as pd
 import numpy as np
 import pymysql as MySQLdb
@@ -109,6 +114,8 @@ def save_migration(function, *args, **kw):  # decorator
 
 # class DataMigrator:
 
+class DbHydraException(Exception):
+    """Raise for db_hydra specific exceptions such as 'pyodbc can't be used on macOS as it's not supported'."""
 
 
 class Migrator:
@@ -380,6 +387,8 @@ class AbstractDBMongo(AbstractDB):
 # AWFUL NAME, SHOULD BE RENAMED WITH MAJOR RELEASE (This connects basic SQL i suppose)
 class db(AbstractDB):
     def connect_remotely(self):
+        if sys.platform == "darwin":
+            raise DbHydraException("pyodbc library (MSSQL) not supported on macOS.")
 
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
@@ -394,6 +403,9 @@ class db(AbstractDB):
         print("DB connection established")
 
     def connect_locally(self):
+        if sys.platform == "darwin":
+            raise DbHydraException("pyodbc library (MSSQL) not supported on macOS.")
+        
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
                                            r'SERVER=' + self.DB_SERVER + ';'
