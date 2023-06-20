@@ -23,6 +23,7 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 
 import abc
+from abc import abstractmethod
 from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
@@ -457,23 +458,27 @@ class db(AbstractDB):
 
 class Mysqldb(AbstractDB):
 
-    python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
-    {
-    'int': "int",
-    'float': "double",
-    'str': "nvarchar(255)",
-    'list': "nvarchar(255)",
-    'dict': "nvarchar(255)",
-    'bool': "bit",
-    'datetime': "datetime"
+    python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = {
+        'int': "int",
+        'float': "double",
+        'str': "nvarchar(255)",
+        'list': "nvarchar(255)",
+        'dict': "nvarchar(255)",
+        'bool': "bit",
+        'datetime': "datetime"
     }
 
+    def connect_to_db(self):
+        self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
+        self.cursor = self.connection.cursor()
+
+    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-
+    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME,
@@ -745,12 +750,14 @@ class Joinable(Selectable):
     pass
 
 
-class AbstractTable(AbstractJoinable):
+class AbstractTable(AbstractJoinable, abc.ABC):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
 
-    # @save_migration
+    @abc.abstractmethod
+    def init_from_column_type_dict(db1, name, column_type_dict):
+        pass
 
     def drop(self):
         query = "DROP TABLE " + self.name
@@ -763,7 +770,7 @@ class AbstractTable(AbstractJoinable):
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
         print(query)
-        self.db1.execute(query)
+        return self.db1.execute(query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
@@ -842,13 +849,13 @@ class AbstractTable(AbstractJoinable):
         #             rows[i][j] = "'" + record + "'"
         #print(rows)
         rows = df.values.tolist()
-        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
+        return self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
 
     #TODO: need to solve inserting in different column_order
     #check df column names, permute if needed
     def insert_from_column_value_dict(self, dict, insert_id=False):
         df = pd.DataFrame(dict, index=[0])
-        self.insert_from_df(df, insert_id=insert_id)
+        return self.insert_from_df(df, insert_id=insert_id)
 
     def insert_from_column_value_dict_list(self, list, insert_id=False):
         df = pd.DataFrame(list)
@@ -1015,10 +1022,10 @@ class PostgresTable(AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    self.db1.execute(query)
+                    return self.db1.execute(query)
                 else:
                     try:
-                        self.db1.execute(query)
+                        return self.db1.execute(query)
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
@@ -1498,12 +1505,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
         assert self.types[0].lower() == "int"
-        query = "CREATE TABLE " + self.name + "(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
-        for i in range(1, len(self.columns)):
-            query += self.columns[i] + " " + self.types[i] + ","
 
-        query = query[:-1]
-        query += ")"
+        column_type_pairs = list(zip(self.columns, self.types))[1:]
+        fields = ", ".join(
+            [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
+        )
+        query = f"CREATE TABLE {self.name} (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -1783,13 +1790,13 @@ from pydantic import BaseModel
 from typing import List, Dict
 
 class AbstractModel(abc.ABC, BaseModel):
-    def generate_dbhydra_table(self, db1, name):
-        structure_dict = create_table_structure_dict(self)
-        #TODO: what type of table, TEST
-        dbhydra_table = MysqlTable(db1, name, list(structure_dict.keys()), list(structure_dict.values()))
+    @classmethod
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name):
+        column_type_dict = create_table_structure_dict(cls)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict)
         return dbhydra_table
 
-
+ 
 
 def create_table_structure_dict(api_class_instance):
     """
