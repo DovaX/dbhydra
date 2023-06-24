@@ -1,30 +1,28 @@
-"""DB Hydra ORM"""
+import abc
+import ast
+import json
+import math
 import sys
+import threading
+from contextlib import contextmanager
+from functools import wraps
+from sys import platform
+
+import numpy as np
+import pandas as pd
 import pymongo
+import pymysql as MySQLdb
+from google.cloud import bigquery
+from google.oauth2 import service_account
+from pydantic import BaseModel
 
 #! Disabled on macOS --> problematic import
 if sys.platform != "darwin":
     import pyodbc
-    
-import pandas as pd
-import numpy as np
-import pymysql as MySQLdb
-from sys import platform
+# disable dependency for server (Temporary)
 if platform != "linux" and platform != "linux2":
     # linux
-    import psycopg2 # disable dependency for server (Temporary)
-
-
-import math
-import json
-import ast
-
-from google.cloud import bigquery
-from google.oauth2 import service_account
-
-import abc
-from abc import abstractmethod
-from contextlib import contextmanager
+    import psycopg2
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -286,6 +284,8 @@ class AbstractDB(abc.ABC):
             self.DB_DRIVER = db_details["DB_DRIVER"]
         else:
             self.DB_DRIVER = "ODBC Driver 13 for SQL Server"
+
+        self.lock = threading.Lock()
 
         self.connect_to_db()
 
@@ -671,8 +671,16 @@ class AbstractSelectable:
         self.name = name
         self.columns = columns
 
-    def select(self, query):
+    @staticmethod
+    def execute_thread_safely(func):
+        """Use Lock inside Connection to ensure DB operations are executed in a thread-safe manner."""
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with self.db1.lock:
+                return func(self, *args, **kwargs)
+        return wrapper
 
+    def select(self, query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         print(query)
@@ -709,7 +717,7 @@ class AbstractSelectable:
         list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
         return (list1)
 
-
+    @execute_thread_safely
     def select_to_df(self):
         rows = self.select_all()
         table_columns = self.columns
@@ -764,6 +772,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         print(query)
         self.db1.execute(query)
 
+    @AbstractSelectable.execute_thread_safely
     def update(self, variable_assign, where=None):
         if where is None:
             query = "UPDATE " + self.name + " SET " + variable_assign
@@ -805,6 +814,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
         return df_copy
 
+
+    @AbstractSelectable.execute_thread_safely
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
 
         if adjust_df:
@@ -862,7 +873,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         self.insert_from_df(df, insert_id=insert_id)
 
 
-
+    @AbstractSelectable.execute_thread_safely
     def delete(self, where=None):
 
         if where is None:
@@ -1786,8 +1797,6 @@ def dict_to_df(dictionary, column1, column2):
     df = pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
     return (df)
 
-from pydantic import BaseModel
-from typing import List, Dict
 
 class AbstractModel(abc.ABC, BaseModel):
     @classmethod
