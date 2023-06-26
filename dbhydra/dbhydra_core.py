@@ -1,3 +1,4 @@
+"""DB Hydra ORM"""
 import abc
 import ast
 import json
@@ -5,7 +6,6 @@ import math
 import sys
 import threading
 from contextlib import contextmanager
-from functools import wraps
 from sys import platform
 
 import numpy as np
@@ -19,10 +19,11 @@ from pydantic import BaseModel
 #! Disabled on macOS --> problematic import
 if sys.platform != "darwin":
     import pyodbc
-# disable dependency for server (Temporary)
+
 if platform != "linux" and platform != "linux2":
     # linux
-    import psycopg2
+    import psycopg2 # disable dependency for server (Temporary)
+
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -671,15 +672,6 @@ class AbstractSelectable:
         self.name = name
         self.columns = columns
 
-    @staticmethod
-    def execute_thread_safely(func):
-        """Use Lock inside Connection to ensure DB operations are executed in a thread-safe manner."""
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            with self.db1.lock:
-                return func(self, *args, **kwargs)
-        return wrapper
-
     def select(self, query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
@@ -717,7 +709,6 @@ class AbstractSelectable:
         list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
         return (list1)
 
-    @execute_thread_safely
     def select_to_df(self):
         rows = self.select_all()
         table_columns = self.columns
@@ -772,7 +763,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         print(query)
         self.db1.execute(query)
 
-    @AbstractSelectable.execute_thread_safely
     def update(self, variable_assign, where=None):
         if where is None:
             query = "UPDATE " + self.name + " SET " + variable_assign
@@ -815,7 +805,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         return df_copy
 
 
-    @AbstractSelectable.execute_thread_safely
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
 
         if adjust_df:
@@ -873,7 +862,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         self.insert_from_df(df, insert_id=insert_id)
 
 
-    @AbstractSelectable.execute_thread_safely
     def delete(self, where=None):
 
         if where is None:
