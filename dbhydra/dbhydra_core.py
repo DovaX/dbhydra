@@ -34,7 +34,7 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
     "smallint": "smallint",
     "character varying": "varchar",
     "text": "longtext",
-    "boolean": "bit",
+    "boolean": "tinyint",
     "double precision": "double",
     "real": "float",
     "numeric": "decimal",
@@ -459,14 +459,15 @@ class db(AbstractDB):
 
 class Mysqldb(AbstractDB):
 
-    python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = {
-        'int': "int",
-        'float': "double",
-        'str': "nvarchar(255)",
-        'list': "nvarchar(255)",
-        'dict': "nvarchar(255)",
-        'bool': "bit",
-        'datetime': "datetime"
+    python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
+    {
+    'int': "int",
+    'float': "double",
+    'str': "varchar(255)",
+    'list': "varchar(255)",
+    'dict': "varchar(255)",
+    'bool': "tinyint",
+    'datetime': "datetime"
     }
 
     def connect_to_db(self):
