@@ -1,29 +1,29 @@
 """DB Hydra ORM"""
+import abc
+import ast
+import json
+import math
 import sys
+import threading
+from contextlib import contextmanager
+from sys import platform
+
+import numpy as np
+import pandas as pd
 import pymongo
+import pymysql as MySQLdb
+from google.cloud import bigquery
+from google.oauth2 import service_account
+from pydantic import BaseModel
 
 #! Disabled on macOS --> problematic import
 if sys.platform != "darwin":
     import pyodbc
-    
-import pandas as pd
-import numpy as np
-import pymysql as MySQLdb
-from sys import platform
+
 if platform != "linux" and platform != "linux2":
     # linux
     import psycopg2 # disable dependency for server (Temporary)
 
-
-import math
-import json
-import ast
-
-from google.cloud import bigquery
-from google.oauth2 import service_account
-
-import abc
-from contextlib import contextmanager
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -46,7 +46,7 @@ PYTHON_TO_MYSQL_DATA_MAPPING = {
     'int': "int",
     'float': "double",
     'str': "varchar(255)",
-    'bool': "tinyint",
+    'bool': "bit",
     'datetime': "datetime"
 }
 
@@ -286,6 +286,8 @@ class AbstractDB(abc.ABC):
         else:
             self.DB_DRIVER = "ODBC Driver 13 for SQL Server"
 
+        self.lock = threading.Lock()
+
         self.connect_to_db()
 
     @abc.abstractmethod
@@ -468,12 +470,17 @@ class Mysqldb(AbstractDB):
     'datetime': "datetime"
     }
 
+    def connect_to_db(self):
+        self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
+        self.cursor = self.connection.cursor()
+
+    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-
+    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME,
@@ -667,7 +674,6 @@ class AbstractSelectable:
         self.columns = columns
 
     def select(self, query):
-
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         print(query)
@@ -703,7 +709,6 @@ class AbstractSelectable:
             all_cols_query = all_cols_query[:-1]
         list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
         return (list1)
-
 
     def select_to_df(self):
         rows = self.select_all()
@@ -745,12 +750,14 @@ class Joinable(Selectable):
     pass
 
 
-class AbstractTable(AbstractJoinable):
+class AbstractTable(AbstractJoinable, abc.ABC):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
 
-    # @save_migration
+    @abc.abstractmethod
+    def init_from_column_type_dict(db1, name, column_type_dict):
+        pass
 
     def drop(self):
         query = "DROP TABLE " + self.name
@@ -763,7 +770,7 @@ class AbstractTable(AbstractJoinable):
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
         print(query)
-        self.db1.execute(query)
+        return self.db1.execute(query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
@@ -798,6 +805,7 @@ class AbstractTable(AbstractJoinable):
 
         return df_copy
 
+
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
 
         if adjust_df:
@@ -806,14 +814,20 @@ class AbstractTable(AbstractJoinable):
         if insert_id:
             assert len(df.columns) == len(self.columns)
             assert set(df.columns) == set(self.columns)
+            
+            inserted_columns=self.columns
+            
         else:
             assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
-            sql_columns = set(self.columns)
-            sql_columns.remove('id')
-            assert set(df.columns) == sql_columns
-
-        df = df[self.columns]
-
+            
+            inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
+            id_index=inserted_columns.index("id")
+            inserted_columns.pop(id_index)
+            print(inserted_columns,df.columns)
+            
+            assert set(df.columns) == set(inserted_columns) #elements are matchin
+            #df = df[inserted_columns]
+        df = df[inserted_columns]
 
         pd_nullable_dtypes = {pd.Int8Dtype(), pd.Int16Dtype(), pd.Int32Dtype(), pd.Int64Dtype(),
                               pd.UInt8Dtype(), pd.UInt16Dtype(), pd.UInt32Dtype(), pd.UInt64Dtype(),
@@ -829,23 +843,24 @@ class AbstractTable(AbstractJoinable):
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = "NULL"
 
+        # rows = df.values.tolist()
+        # for i, row in enumerate(rows):
+        #     for j, record in enumerate(row):
+        #         if type(record) == str:
+        #             rows[i][j] = "'" + record + "'"
+        #print(rows)
         rows = df.values.tolist()
-        for i, row in enumerate(rows):
-            for j, record in enumerate(row):
-                if type(record) == str:
-                    rows[i][j] = "'" + record + "'"
-        self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
+        return self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
 
     #TODO: need to solve inserting in different column_order
     #check df column names, permute if needed
     def insert_from_column_value_dict(self, dict, insert_id=False):
         df = pd.DataFrame(dict, index=[0])
-        self.insert_from_df(df, insert_id=insert_id)
+        return self.insert_from_df(df, insert_id=insert_id)
 
     def insert_from_column_value_dict_list(self, list, insert_id=False):
         df = pd.DataFrame(list)
         self.insert_from_df(df, insert_id=insert_id)
-
 
 
     def delete(self, where=None):
@@ -854,7 +869,6 @@ class AbstractTable(AbstractJoinable):
             query = "DELETE FROM " + self.name
         else:
             query = "DELETE FROM " + self.name + " WHERE " + where
-        print(query)
         self.db1.execute(query)
 
 
@@ -1008,10 +1022,10 @@ class PostgresTable(AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    self.db1.execute(query)
+                    return self.db1.execute(query)
                 else:
                     try:
-                        self.db1.execute(query)
+                        return self.db1.execute(query)
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
@@ -1491,12 +1505,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == "id"
         assert self.types[0].lower() == "int"
-        query = "CREATE TABLE " + self.name + "(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
-        for i in range(1, len(self.columns)):
-            query += self.columns[i] + " " + self.types[i] + ","
 
-        query = query[:-1]
-        query += ")"
+        column_type_pairs = list(zip(self.columns, self.types))[1:]
+        fields = ", ".join(
+            [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
+        )
+        query = f"CREATE TABLE {self.name} (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -1772,17 +1786,15 @@ def dict_to_df(dictionary, column1, column2):
     df = pd.DataFrame(list(dictionary.items()), columns=[column1, column2])
     return (df)
 
-from pydantic import BaseModel
-from typing import List, Dict
 
 class AbstractModel(abc.ABC, BaseModel):
-    def generate_dbhydra_table(self, db1, name):
-        structure_dict = create_table_structure_dict(self)
-        #TODO: what type of table, TEST
-        dbhydra_table = MysqlTable(db1, name, list(structure_dict.keys()), list(structure_dict.values()))
+    @classmethod
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name):
+        column_type_dict = create_table_structure_dict(cls)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict)
         return dbhydra_table
 
-
+ 
 
 def create_table_structure_dict(api_class_instance):
     """
