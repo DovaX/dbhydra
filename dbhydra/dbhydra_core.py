@@ -503,9 +503,7 @@ class Mysqldb(AbstractDB):
         self.connection.commit()
 
     def execute(self, query):
-
-        self.cursor.execute(query)
-        self.connection.commit()
+        return self.cursor.execute(query)
 
     def get_all_tables(self):
         sysobjects_table = Table(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
@@ -543,8 +541,6 @@ class PostgresDb(AbstractDBPostgres):
 
     def execute(self, query):
         self.cursor.execute(query)
-        self.connection.commit()
-
         # return  [''.join(i) for i in self.cursor.fetchall()]
 
     def get_all_tables(self):
@@ -869,7 +865,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             query = "DELETE FROM " + self.name
         else:
             query = "DELETE FROM " + self.name + " WHERE " + where
-        self.db1.execute(query)
+        return self.db1.execute(query)
 
 
 class PostgresTable(AbstractTable):
@@ -1579,10 +1575,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    self.db1.execute(query)
+                    return self.db1.execute(query)
                 else:
                     try:
-                        self.db1.execute(query)
+                        return self.db1.execute(query)
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
