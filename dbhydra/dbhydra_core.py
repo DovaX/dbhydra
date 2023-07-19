@@ -10,7 +10,7 @@ from sys import platform
 
 import numpy as np
 import pandas as pd
-import pymongo7
+import pymongo
 import pymysql as MySQLdb
 from google.cloud import bigquery
 from google.oauth2 import service_account
