@@ -10,7 +10,7 @@ from sys import platform
 
 import numpy as np
 import pandas as pd
-import pymongo
+import pymongo7
 import pymysql as MySQLdb
 from google.cloud import bigquery
 from google.oauth2 import service_account
@@ -755,7 +755,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         super().__init__(db1, name, columns)
         self.types = types
 
-    @abc.abstractmethod
+    # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
+    # @abc.abstractmethod
     def init_from_column_type_dict(db1, name, column_type_dict):
         pass
 
