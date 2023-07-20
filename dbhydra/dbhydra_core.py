@@ -347,9 +347,11 @@ class AbstractDB(abc.ABC):
 
             yield table
 
-    def execute(self, query):
-        self.cursor.execute(query)
-        self.cursor.commit()
+    def execute(self, query, is_autocommitting=True):
+        result=self.cursor.execute(query)
+        if is_autocommitting:
+            self.cursor.commit()
+        return(result)
 
     def close_connection(self):
         self.connection.close()
@@ -502,8 +504,12 @@ class Mysqldb(AbstractDB):
 
         self.connection.commit()
 
-    def execute(self, query):
-        return self.cursor.execute(query)
+    def execute(self, query, is_autocommitting=True):
+        result=self.cursor.execute(query)
+        if is_autocommitting:
+            self.connection.commit()
+        return result
+    
 
     def get_all_tables(self):
         sysobjects_table = Table(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])
@@ -539,8 +545,12 @@ class PostgresDb(AbstractDBPostgres):
         self.connection.autocommit = True
         self.cursor = self.connection.cursor()
 
-    def execute(self, query):
-        self.cursor.execute(query)
+    def execute(self, query, is_autocommitting=True):
+        result=self.cursor.execute(query)
+        if is_autocommitting:
+            self.connection.commit()
+        return result
+
         # return  [''.join(i) for i in self.cursor.fetchall()]
 
     def get_all_tables(self):
@@ -634,10 +644,12 @@ class MongoDb(AbstractDBMongo):
         print(self.database)
         print("DB connection established")
 
-    def execute(self, query):
-        self.cursor.execute(query)
-        self.connection.commit()
-
+    def execute(self, query, is_autocommitting=True):
+        result=self.cursor.execute(query)
+        if is_autocommitting:
+            self.connection.commit()
+        return(result)
+    
     def get_all_tables(self):
         return self.database.list_collection_names()
 
