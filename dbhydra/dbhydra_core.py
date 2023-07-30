@@ -767,7 +767,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
-    def init_from_column_type_dict(db1, name, column_type_dict):
+    def init_from_column_type_dict(db1, name, column_type_dict, init_from_column_type_dict="id"):
         pass
 
     def drop(self):
@@ -1403,11 +1403,11 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         self.id_column_name = id_column_name
 
     @classmethod
-    def init_from_column_type_dict(cls, db1, name, column_type_dict):
+    def init_from_column_type_dict(cls, db1, name, column_type_dict, id_column_name="id"):
         column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
         columns = list(column_converted_type_dict.keys())
         types = list(column_converted_type_dict.values())
-        return cls(db1, name, columns, types)
+        return cls(db1, name, columns, types, id_column_name=id_column_name)
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
@@ -1803,7 +1803,7 @@ class AbstractModel(abc.ABC, BaseModel):
     @classmethod
     def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id"):
         column_type_dict = create_table_structure_dict(cls, id_column_name=id_column_name)
-        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name)
         return dbhydra_table
 
  
