@@ -1397,9 +1397,10 @@ class Table(Joinable, AbstractTable):
 
 
 class MysqlTable(MysqlSelectable, AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns)
         self.types = types
+        self.id_column_name = id_column_name
 
     @classmethod
     def init_from_column_type_dict(cls, db1, name, column_type_dict):
