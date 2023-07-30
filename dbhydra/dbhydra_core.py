@@ -759,9 +759,11 @@ class Joinable(Selectable):
 
 
 class AbstractTable(AbstractJoinable, abc.ABC):
-    def __init__(self, db1, name, columns=None, types=None):
+    def __init__(self, db1, name, columns = None, types = None, id_column_name = "id"):
+        """id_column_name -> name of predefined column with autoincrement + PK"""
         super().__init__(db1, name, columns)
         self.types = types
+        self.id_column_name = id_column_name
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
@@ -830,7 +832,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
             
             inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
-            id_index=inserted_columns.index("id")
+            id_index=inserted_columns.index(self.id_column_name)
             inserted_columns.pop(id_index)
             print(inserted_columns,df.columns)
             
@@ -937,10 +939,10 @@ class PostgresTable(AbstractTable):
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
-        if "id" in columns:
-            id_col_index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            id_col_index = columns.index(temporary_table.id_column_name)
             columns.pop(id_col_index)
-            columns.insert(0, "id")
+            columns.insert(0, temporary_table.id_column_name)
             types.pop(id_col_index)
             types.insert(0, "int")
 
@@ -949,9 +951,9 @@ class PostgresTable(AbstractTable):
     # @save_migration
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int" or self.types[0].lower() == "integer"
-        query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
+        query = "CREATE TABLE " + self.name + "("+self.id_column_name+" SERIAL PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
 
@@ -1199,12 +1201,12 @@ class MongoTable():
         columns = values[0][1:]
         types = values[1][1:]
 
-        if "id" in columns:
-            index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            index = columns.index(temporary_table.id_column_name)
             columns.pop(index)
             types.pop(index)
 
-        columns.insert(0, "id")
+        columns.insert(0, temporary_table.id_column_name)
         types.insert(0, "int")
         types = [x.lower() for x in types]
         types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
@@ -1303,12 +1305,12 @@ class Table(Joinable, AbstractTable):
 
     def create(self):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
-        query = "CREATE TABLE " + self.name + "(id INT IDENTITY(1,1) NOT NULL,"
+        query = "CREATE TABLE " + self.name + "("+self.id_column_name+" INT IDENTITY(1,1) NOT NULL,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
-        query += "PRIMARY KEY(id))"
+        query += "PRIMARY KEY("+self.id_column_name+"))"
 
         print(query)
         try:
@@ -1475,10 +1477,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
-        if "id" in columns:
-            id_col_index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            id_col_index = columns.index(temporary_table.id_column_name)
             columns.pop(id_col_index)
-            columns.insert(0, "id")
+            columns.insert(0, temporary_table.id_column_name)
             types.pop(id_col_index)
             types.insert(0, "int")
 
@@ -1491,7 +1493,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         Returns the biggest id from table
         """
 
-        last_id = self.select(f"SELECT id FROM {self.name} ORDER BY id DESC LIMIT 1;")
+        last_id = self.select(f"SELECT {self.id_column_name} FROM {self.name} ORDER BY {self.id_column_name} DESC LIMIT 1;")
 
         return last_id[0][0]
 
@@ -1512,14 +1514,14 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     # @save_migration #TODO: Uncomment
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
 
         column_type_pairs = list(zip(self.columns, self.types))[1:]
         fields = ", ".join(
             [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
         )
-        query = f"CREATE TABLE {self.name} (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
+        query = f"CREATE TABLE {self.name} ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -1607,7 +1609,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
         print(query)
         self.db1.execute(query)
-        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "(id)"
+        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
         print(query)
         self.db1.execute(query)
 
