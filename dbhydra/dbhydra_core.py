@@ -1801,18 +1801,18 @@ def dict_to_df(dictionary, column1, column2):
 
 class AbstractModel(abc.ABC, BaseModel):
     @classmethod
-    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name):
-        column_type_dict = create_table_structure_dict(cls)
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id"):
+        column_type_dict = create_table_structure_dict(cls, id_column_name=id_column_name)
         dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict)
         return dbhydra_table
 
  
 
-def create_table_structure_dict(api_class_instance):
+def create_table_structure_dict(api_class_instance, id_column_name="id"):
     """
     Accepts instance of API data class (e.g. APIDatabase) and converts it to dictionary {attribute_name: attribute_type}
     """
-    table_structure_dict = {"id": "int"}
+    table_structure_dict = {id_column_name: "int"}
     table_structure_dict = {**table_structure_dict,
                             **{attribute_name: attribute_type.__name__ for attribute_name, attribute_type in api_class_instance.__annotations__.items()}}
 
