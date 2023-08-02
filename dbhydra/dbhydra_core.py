@@ -1538,7 +1538,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                 query = "INSERT INTO " + self.name + " ("
                 for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
-                        query += self.columns[i] + ","
+                        # column name containing space needs to be wrapped in `...`, otherwise causes syntax error
+                        if " " in self.columns[i]:
+                            column_name = '`' + self.columns[i] + '`'
+                        else:
+                            column_name = self.columns[i]
+                        query += column_name + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
                 if query[-1] == ',':
