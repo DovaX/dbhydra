@@ -1564,6 +1564,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     if replace_apostrophes:
                         rows[k][j] = str(rows[k][j]).replace("'", "")
                     query += "'" + str(rows[k][j]) + "',"
+                elif "char" in self.types[j + start_index]:
+                    if replace_apostrophes:
+                        rows[k][j] = str(rows[k][j]).replace("'", "")
+                    query += "'" + str(rows[k][j]) + "',"
                 elif self.types[j + start_index] == "int":
                     query += str(rows[k][j]) + ","
                 elif "datetime" in self.types[j + start_index]:
