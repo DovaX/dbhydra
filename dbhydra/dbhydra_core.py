@@ -45,7 +45,7 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
 PYTHON_TO_MYSQL_DATA_MAPPING = {
     'int': "int",
     'float': "double",
-    'str': "varchar(255)",
+    'str': "nvarchar(2047)",
     'bool': "bit",
     'datetime': "datetime"
 }
@@ -465,9 +465,9 @@ class Mysqldb(AbstractDB):
     {
     'int': "int",
     'float': "double",
-    'str': "varchar(255)",
-    'list': "varchar(255)",
-    'dict': "varchar(255)",
+    'str': "nvarchar(2047)",
+    'list': "nvarchar(2047)",
+    'dict': "nvarchar(2047)",
     'bool': "tinyint",
     'datetime': "datetime"
     }
@@ -1440,8 +1440,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     """
         Returns a list of data types, where each element represents the category of the data ('varchar', 'int', etc.). 
         If a data type has an associated length, the length value will be included in a corresponding element of the
-        data_lengths list, otherwise the element will have a None value. For example, 'varchar(255)' would return
-        'varchar' in the data_types list and 255 in the data_lengths list.
+        data_lengths list, otherwise the element will have a None value. For example, 'nvarchar(2047)' would return
+        'varchar' in the data_types list and 2047 in the data_lengths list.
     """
     def get_data_types_and_character_lengths(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
@@ -1536,6 +1536,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
         print(self.types)
+        total_output=[]
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
@@ -1591,10 +1592,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    return self.db1.execute(query)
+                    output=self.db1.execute(query)
+                    total_output.append(output)
                 else:
                     try:
-                        return self.db1.execute(query)
+                        output=self.db1.execute(query)
+                        total_output.append(output)
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
@@ -1603,6 +1606,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                         if debug_mode:
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
+            
+            elif len(total_output)==1:
+                return(total_output[0])
+            else:
+                return(total_output)
+                
 
     def add_foreign_key(self, foreign_key):
         parent_id = foreign_key['parent_id']
