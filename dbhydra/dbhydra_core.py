@@ -460,6 +460,10 @@ class db(AbstractDB):
         return (foreign_keys)
 
 
+class JSONable(str):
+    pass
+
+
 class Mysqldb(AbstractDB):
 
     python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
@@ -467,10 +471,12 @@ class Mysqldb(AbstractDB):
     'int': "int",
     'float': "double",
     'str': "nvarchar(2047)",
+    'tuple': "JSON",
     'list': "nvarchar(2047)",
     'dict': "nvarchar(2047)",
     'bool': "tinyint",
-    'datetime': "datetime"
+    'datetime': "datetime",
+    'JSONable': "JSON"
     }
 
     def connect_to_db(self):
@@ -974,9 +980,7 @@ class PostgresTable(AbstractTable):
 
     def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
         start_index = 0 if insert_id else 1
-        print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
-        print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
@@ -1039,6 +1043,7 @@ class PostgresTable(AbstractTable):
                     print(query)
 
                 if not try_mode:
+                    print(query)
                     return self.db1.execute(query)
                 else:
                     try:
@@ -1540,9 +1545,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
         start_index = 0 if insert_id else 1
-        print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
-        print(self.types)
         total_output=[]
         for k in range(len(rows)):
             if k % batch == 0:
@@ -1583,7 +1586,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     query += "'" + str(rows[k][j]) + "',"
                 elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
-
+                elif "JSON" in self.types[j + start_index]:
+                    query += f"'{rows[k][j]}', "
 
 
                 else:
@@ -1599,6 +1603,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     print(query)
 
                 if not try_mode:
+                    print(query)
                     output=self.db1.execute(query)
                     total_output.append(output)
                 else:
