@@ -1685,12 +1685,13 @@ class XlsxDB(AbstractDB):
         'int': "int",
         'float': "double",
         'str': "str",
+        'tuple': "str",
         'list': "str",
         'dict': "str",
         'bool': "bool",
-        'datetime': "datetime"
+        'datetime': "datetime",
+        'JSONable': "str"
         }
-
 
         """
         db_details=read_connection_details(config_file)
