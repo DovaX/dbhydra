@@ -1044,7 +1044,6 @@ class PostgresTable(AbstractTable):
 
                 if not try_mode:
                     print(query)
-                    return self.db1.execute(query)
                 else:
                     try:
                         return self.db1.execute(query)
@@ -1603,7 +1602,6 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    print(query)
                     output=self.db1.execute(query)
                     total_output.append(output)
                 else:
