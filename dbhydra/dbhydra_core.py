@@ -8,6 +8,8 @@ import threading
 from contextlib import contextmanager
 from sys import platform
 import os
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -1680,7 +1682,7 @@ class XlsxDB(AbstractDB):
         else:
             self.name = db_details.get("DB_DATABASE")
         self.lock = threading.Lock()
-        
+
         self.python_database_type_mapping = {
         'int': "int",
         'float': "double",
@@ -1750,10 +1752,10 @@ class XlsxDB(AbstractDB):
 
     def create_database(self):
         try:
-            os.mkdir(self.name)
-            print("Database created")
+            os.mkdir("database")
+            print("Database directory created")
         except FileExistsError:
-            print("Database is already created")
+            print("Database directory already exists")
 
 
 class XlsxTable(AbstractTable):
@@ -1762,17 +1764,19 @@ class XlsxTable(AbstractTable):
         self.types = types
         self.id_column_name=id_column_name
         
-        
     def create(self):
-        df=pd.DataFrame(columns=self.columns)
-        df.to_excel(self.db1.name + "\\" + self.name + ".xlsx",index=False)
-    
+        if not Path(f"database/{self.name}.xlsx").exists():
+            df=pd.DataFrame(columns=self.columns)
+            df.to_excel(f"database/{self.name}.xlsx",index=False)
+        else:
+            print(f"Table '{self.name}' already exists")
+
     def drop(self):
         pass
 
     def select_to_df(self):
         try:
-            df = pd.read_excel(self.db1.name + "//" + self.name + ".xlsx")
+            df = pd.read_excel(f"database/{self.name}.xlsx")
             # cols=df.columns
             # print(cols)
             # df.set_index(cols[0],inplace=True)
@@ -1806,43 +1810,92 @@ class XlsxTable(AbstractTable):
                 maximal_index=0
             df.index = df.index + maximal_index + 1
             df.reindex(columns=original_df.columns.tolist()) #to ensure that columns get correctly inserted
-            original_df = original_df.append(df)
-            # df=pd.concat([original_df,df])
-            return (original_df)
+            result_df = pd.concat([original_df,df])
+            return (result_df)
 
         df = concat_with_reset_index_in_second_df(original_df, df)
         df["uid"]=df.index
         df.reindex(columns=["uid"]+df.columns[:-1].tolist()) #uid as a first column
         df.reset_index(drop=True,inplace=True)
         print("INSERTED",df)
-        df.to_excel(self.db1.name + "\\" + self.name + ".xlsx",index=False)
+        df.to_excel(f"database/{self.name}.xlsx",index=False)
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
         #df.drop(df.columns[0], axis=1, inplace=True)
-        df.to_excel(self.db1.name + "\\" + self.name + ".xlsx",index=False)
+        df.to_excel(f"database/{self.name}.xlsx",index=False)
 
-    def update(self, variable_assign, where=None):
-        def split_assign(variable_assign):
-            variable = variable_assign.split("=")[0]
-            value = variable_assign.split("=")[1]
-            try:
-                value = int(value)  # integers
-            except:
-                value = value.split("'")[1]  # strings
-            return (variable, value)
+    # def update(self, variable_assign: str, where: Optional[str] = None):
+    #     def split_assign(variable_assign):
+    #         variable = variable_assign.split("=")[0]
+    #         value = variable_assign.split("=")[1]
+    #         try:
+    #             value = int(value)  # integers
+    #         except:
+    #             value = value.split("'")[1]  # strings
+    #         return (variable, value)
 
-        variable, value = split_assign(variable_assign)
+    #     variable, value = split_assign(variable_assign)
+    #     df = self.select_to_df()
+    #     print(where)
+    #     print(variable, value)
+    #     if where is None:
+    #         df[variable] = value
+    #         print(df)
+    #     else:
+    #         where_variable, where_value = split_assign(where)
+    #         df[variable] = df[where_variable].apply(lambda x: value if str(x) == str(where_value) else x) #
+    #     self.replace_from_df(df)
+
+    def update(self, sql_column_update_string: str, sql_where_string: str) -> None:
+        """Decompose provided parts of SQL UPDATE statement and update the xlsx file accordingly.
+
+        TODO: Very fragile, unintuitive, and error-prone. Should be replaced with update_from_df().
+        BUG: This will fail spectacularly on any JSON-like value in a `sql_column_update_string` or `sql_where_string'
+
+        :param sql_column_update_string: e.g. "project_key='jakubatforloop.ai', project_name='Untitled Project'
+        :type sql_column_update_string: str
+        :param sql_where_string: e.g. "uid='1'"
+        :type sql_where_string: str
+        """
+
+        # "project_key='jakubatforloop.ai', project_name='Untitled Project', last_active_pipeline_uid='1'"
+        column_value_strings = sql_column_update_string.split(",")
+        # ["project_key='jakubatforloop.ai'", " project_name='Untitled Project'", " last_active_pipeline_uid='1'"]
+        column_value_pairs = [pair.split("=") for pair in column_value_strings]
+        # [['project_key', "'jakubatforloop.ai'"], [' project_name', "'Untitled Project'"], [' last_active_pipeline_uid', "'1'"]]
+        column_value_pairs = [
+            [column.strip(' "\''), value.strip(' "\'')] for column, value in column_value_pairs
+        ]
+        # [['project_key', 'jakubatforloop.ai'], ['project_name', 'Untitled Project'], ['last_active_pipeline_uid', '1']]
+
+        where_column, where_value = sql_where_string.split("=")
+        where_value = where_value.strip(' "\'')
+
         df = self.select_to_df()
-        print(where)
-        print(variable, value)
-        if where is None:
-            df[variable] = value
-            print(df)
-        else:
-            where_variable, where_value = split_assign(where)
-            df[variable] = df[where_variable].apply(lambda x: value if str(x) == str(where_value) else x) #
-        self.replace_from_df(df)
+        columns_to_update = [pair[0] for pair in column_value_pairs]
+        values_to_update = [pair[1] for pair in column_value_pairs]
+        # HACK: Currently this function is called on Forloop backend with 'uid' being a string as the 'where_value'
+        # To keep compatibility, it's cast to int here, but this should be fixed ASAP and the casting removed
+        df.loc[df[where_column] == int(where_value), columns_to_update] = values_to_update
+        df.to_excel(f"database/{self.name}.xlsx", index=False)
+
+    def update_from_df(self, update_df: pd.DataFrame, where_column: str, where_value: Any) -> None:
+        """Update the xlsx file with the provided dataframe.
+
+        :param update_df: Dataframe with updated values - MUST only hold a single row
+        :type update_df: pd.DataFrame
+        :param where_column: Column name to use for WHERE clause.
+        :type where_column: str
+        :param where_value: Value to use for WHERE clause.
+        :type where_value: Any
+        """
+        if not len(update_df) == 1:
+            raise ValueError("There can only be one row in the UPDATE dataframe")
+
+        table_df = self.select_to_df()
+        table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df
+        table_df.to_excel(f"database/{self.name}.xlsx", index=False)
 
     def delete(self, where=None):
         def split_assign(variable_assign):
