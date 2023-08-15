@@ -1676,12 +1676,13 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
 
 class XlsxDB(AbstractDB):
-    def __init__(self, config_file="config.ini", db_details=None):
+    def __init__(self, config_file="config.ini", db_details=None, db_directory_path: Path = Path("database")):
         if db_details is None:
             self.name="new_db"
         else:
             self.name = db_details.get("DB_DATABASE")
         self.lock = threading.Lock()
+        self.db_directory_path = db_directory_path
 
         self.python_database_type_mapping = {
         'int': "int",
@@ -1752,22 +1753,23 @@ class XlsxDB(AbstractDB):
 
     def create_database(self):
         try:
-            os.mkdir("database")
+            os.mkdir(self.db_directory_path)
             print("Database directory created")
         except FileExistsError:
             print("Database directory already exists")
 
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
+    def __init__(self, db1: XlsxDB, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns)
         self.types = types
         self.id_column_name=id_column_name
-        
+        self.db_path: Path = self.db1.db_directory_path / f"{self.name}.xlsx"
+
     def create(self):
-        if not Path(f"database/{self.name}.xlsx").exists():
+        if not self.db_path.exists():
             df=pd.DataFrame(columns=self.columns)
-            df.to_excel(f"database/{self.name}.xlsx",index=False)
+            df.to_excel(self.db_path, index=False)
         else:
             print(f"Table '{self.name}' already exists")
 
@@ -1776,7 +1778,7 @@ class XlsxTable(AbstractTable):
 
     def select_to_df(self):
         try:
-            df = pd.read_excel(f"database/{self.name}.xlsx")
+            df = pd.read_excel(self.db_path)
             # cols=df.columns
             # print(cols)
             # df.set_index(cols[0],inplace=True)
@@ -1817,13 +1819,12 @@ class XlsxTable(AbstractTable):
         df["uid"]=df.index
         df.reindex(columns=["uid"]+df.columns[:-1].tolist()) #uid as a first column
         df.reset_index(drop=True,inplace=True)
-        print("INSERTED",df)
-        df.to_excel(f"database/{self.name}.xlsx",index=False)
+        df.to_excel(self.db_path, index=False)
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
         #df.drop(df.columns[0], axis=1, inplace=True)
-        df.to_excel(f"database/{self.name}.xlsx",index=False)
+        df.to_excel(self.db_path, index=False)
 
     # def update(self, variable_assign: str, where: Optional[str] = None):
     #     def split_assign(variable_assign):
