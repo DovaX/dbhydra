@@ -1043,7 +1043,7 @@ class PostgresTable(AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    print(query)
+                    return self.db1.execute(query)
                 else:
                     try:
                         return self.db1.execute(query)
