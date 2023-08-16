@@ -1894,7 +1894,8 @@ class XlsxTable(AbstractTable):
         """Decompose provided parts of SQL UPDATE statement and update the xlsx file accordingly.
 
         TODO: Very fragile, unintuitive, and error-prone. Should be replaced with update_from_df().
-        BUG: This will fail spectacularly on any JSON-like value in a `sql_column_update_string` or `sql_where_string'
+        BUG: This will fail spectacularly on any values containing ',' in a
+        `sql_column_update_string` or `sql_where_string'
 
         :param sql_column_update_string: e.g. "project_key='jakubatforloop.ai', project_name='Untitled Project'
         :type sql_column_update_string: str
