@@ -1825,7 +1825,7 @@ class XlsxTable(AbstractTable):
             # print(cols)
             # df.set_index(cols[0],inplace=True)
             # df.drop(df.columns[0],axis=1,inplace=True)
-
+            df.fillna("NULL", inplace=True) # HACK: Excel does not support NULLable cells
         except Exception as e:
             print("Error: ", e)
             df = pd.DataFrame(columns=self.columns)
@@ -1835,7 +1835,6 @@ class XlsxTable(AbstractTable):
         assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         original_df = self.select_to_df()
-        original_df.fillna("NULL", inplace=True) # HACK: DBHydra does not cast
 
         original_df.index=original_df[self.id_column_name]
         try:
