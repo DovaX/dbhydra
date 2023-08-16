@@ -1825,7 +1825,7 @@ class XlsxTable(AbstractTable):
             # print(cols)
             # df.set_index(cols[0],inplace=True)
             # df.drop(df.columns[0],axis=1,inplace=True)
-            df.fillna("NULL", inplace=True) # HACK: Excel does not support NULLable cells
+            df.replace({np.nan: None}, inplace=True)
         except Exception as e:
             print("Error: ", e)
             df = pd.DataFrame(columns=self.columns)
@@ -1844,7 +1844,7 @@ class XlsxTable(AbstractTable):
 
         # handling nan values -> change to NULL TODO
         for column in list(df.columns):
-            df.loc[pd.isna(df[column]), column] = "NULL"
+            df.loc[pd.isna(df[column]), column] = None
 
         def concat_with_reset_index_in_second_df(original_df, df):
             """Subsitute of reset_index method because we need to maintain the ids of original df"""
