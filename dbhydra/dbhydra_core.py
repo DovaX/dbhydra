@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from sys import platform
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -1876,10 +1876,8 @@ class XlsxTable(AbstractTable):
         df = self.select_to_df()
         columns_to_update = [pair[0] for pair in column_value_pairs]
         values_to_update = [pair[1] for pair in column_value_pairs]
-        # HACK: Currently this function is called on Forloop backend with 'uid' being a string as the 'where_value'
-        # To keep compatibility, it's cast to int here, but this should be fixed ASAP and the casting removed
-        df.loc[df[where_column] == int(where_value), columns_to_update] = values_to_update
-        df.to_excel(f"database/{self.name}.xlsx", index=False)
+        df.loc[df[where_column] == where_value, columns_to_update] = values_to_update
+        df.to_excel(self.db_path, index=False)
 
     def update_from_df(self, update_df: pd.DataFrame, where_column: str, where_value: Any) -> None:
         """Update the xlsx file with the provided dataframe.
@@ -1896,9 +1894,9 @@ class XlsxTable(AbstractTable):
 
         table_df = self.select_to_df()
         table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df
-        table_df.to_excel(f"database/{self.name}.xlsx", index=False)
+        table_df.to_excel(self.db_path, index=False)
 
-    def delete(self, where=None):
+    def delete(self, where=None) -> Optional[int]:
         def split_assign(variable_assign):
             variable = variable_assign.split("=")[0]
             value = variable_assign.split("=")[1]
@@ -1909,14 +1907,16 @@ class XlsxTable(AbstractTable):
             return (variable, value)
 
         df = self.select_to_df()
+        before_delete_count = len(df)
         if where is None:
             df = df.iloc[0:0]
-            print(df)
+            deleted_count = before_delete_count - 0
         else:
             where_variable, where_value = split_assign(where)
             df.drop(df[df[where_variable] == where_value].index, inplace=True)
+            deleted_count = before_delete_count - len(df)
         self.replace_from_df(df)
-
+        return deleted_count
 
 # dataframe - dictionary auxiliary functions
 def df_to_dict(df, column1, column2):
