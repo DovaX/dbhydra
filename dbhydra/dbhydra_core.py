@@ -1859,7 +1859,7 @@ class XlsxTable(AbstractTable):
 
         df = concat_with_reset_index_in_second_df(original_df, df)
         df["uid"]=df.index
-        df.reindex(columns=["uid"]+df.columns[:-1].tolist()) #uid as a first column
+        df = df.reindex(columns=["uid"]+df.columns[:-1].tolist()) #uid as a first column
         df.reset_index(drop=True,inplace=True)
         df.to_excel(self.db_path, index=False)
 
