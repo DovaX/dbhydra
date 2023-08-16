@@ -797,6 +797,48 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         print(query)
         return self.db1.execute(query)
 
+    def update_from_df(
+            self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None) -> None:
+        """Build UPDATE SQL query from a dataframe and execute it.
+
+        :param update_df: Dataframe with updated values - MUST only hold a single row
+        :type update_df: pd.DataFrame
+        :param where_column: Column name to use for WHERE clause.
+        :type where_column: str
+        :param where_value: Value to use for WHERE clause.
+        :type where_value: Any
+        """
+        if not len(update_df) == 1:
+            raise ValueError("There can only be one row in the UPDATE dataframe")
+
+        column_types_without_uid = self.types[1:]
+        if len(column_types_without_uid) != len(update_df.columns):
+            raise AttributeError(
+                "Number of columns in dataframe does not match number of columns in table"
+            )
+
+        column_value_string = ""
+        for (column, cell_value), column_type in zip(update_df.iloc[0].items(), column_types_without_uid):
+            if cell_value is None:
+                column_value_string += f"{column} = NULL, "
+            elif column_type in ["double", "int", "tinyint"]:
+                column_value_string += f"{column} = {cell_value}, "
+            elif column_type in ["nvarchar(2047)", "datetime", "JSON"]:
+                column_value_string += f"{column} = '{cell_value}', "
+            else:
+                raise AttributeError(f"Unknown column type '{column_type}'")
+
+        column_value_string = column_value_string.rstrip(", ")
+        sql_query = f"UPDATE {self.name} SET {column_value_string}"
+
+        if where_column is not None and where_value is not None:
+            sql_query += f" WHERE {where_column} = {where_value};"
+        else:
+            sql_query += ";" 
+
+        print(sql_query)
+        self.db1.execute(sql_query)
+
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
         Adjust DataFrame in case number of its columns differs from number of columns in DB table.
