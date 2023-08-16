@@ -1835,6 +1835,7 @@ class XlsxTable(AbstractTable):
         assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         original_df = self.select_to_df()
+        original_df.fillna("NULL", inplace=True) # HACK: DBHydra does not cast
 
         original_df.index=original_df[self.id_column_name]
         try:
