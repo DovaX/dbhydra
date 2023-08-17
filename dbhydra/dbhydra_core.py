@@ -6,6 +6,7 @@ import math
 import sys
 import threading
 from contextlib import contextmanager
+from copy import copy
 from sys import platform
 import os
 from pathlib import Path
@@ -768,11 +769,11 @@ class Joinable(Selectable):
 
 
 class AbstractTable(AbstractJoinable, abc.ABC):
-    def __init__(self, db1, name, columns = None, types = None, id_column_name = "id"):
+    def __init__(self, db1, name, columns = None, types: Optional[list[str]] = None, id_column_name: str = "id"):
         """id_column_name -> name of predefined column with autoincrement + PK"""
         super().__init__(db1, name, columns)
-        self.types = types
-        self.id_column_name = id_column_name
+        self.types: list[str] = [] if types is None else types
+        self.id_column_name: str = id_column_name
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
@@ -811,7 +812,12 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if not len(update_df) == 1:
             raise ValueError("There can only be one row in the UPDATE dataframe")
 
-        column_types_without_uid = self.types[1:]
+        column_types_without_uid = copy(self.types)
+        try:
+            column_types_without_uid = column_types_without_uid.remove(self.id_column_name)
+        except ValueError:
+            pass
+        
         if len(column_types_without_uid) != len(update_df.columns):
             raise AttributeError(
                 "Number of columns in dataframe does not match number of columns in table"
@@ -823,7 +829,9 @@ class AbstractTable(AbstractJoinable, abc.ABC):
                 column_value_string += f"{column} = NULL, "
             elif column_type in ["double", "int", "tinyint"]:
                 column_value_string += f"{column} = {cell_value}, "
-            elif column_type in ["nvarchar(2047)", "datetime", "JSON"]:
+            elif "varchar" in column_type:
+                column_value_string += f"{column} = '{cell_value}', "
+            elif column_type in ["JSON", "text", "mediumtext", "longtext", "datetime"]:
                 column_value_string += f"{column} = '{cell_value}', "
             else:
                 raise AttributeError(f"Unknown column type '{column_type}'")
@@ -834,7 +842,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if where_column is not None and where_value is not None:
             sql_query += f" WHERE {where_column} = {where_value};"
         else:
-            sql_query += ";" 
+            sql_query += ";"
 
         print(sql_query)
         self.db1.execute(sql_query)
