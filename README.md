@@ -46,6 +46,7 @@ print(table_test.columns)
 
 table2 = dh.Table(db1,"test_new",["id","test2"],["int","nvarchar(20)"])
 #table2.create()
+#table2.drop()
 ```
 ## Current scope
 Aims: Easy integration with Pandas, SQL SERVER/MySQL database, and exports/imports to/from excel/CSV format
