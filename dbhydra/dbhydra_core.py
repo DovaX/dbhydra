@@ -1,6 +1,5 @@
 """DB Hydra ORM"""
 import abc
-import ast
 import json
 import math
 import sys
@@ -463,7 +462,7 @@ class db(AbstractDB):
         return (foreign_keys)
 
 
-class JSONable(str):
+class Jsonable(str):
     pass
 
 
@@ -474,12 +473,12 @@ class Mysqldb(AbstractDB):
     'int': "int",
     'float': "double",
     'str': "nvarchar(2047)",
-    'tuple': "JSON",
+    'tuple': "json",
     'list': "nvarchar(2047)",
     'dict': "nvarchar(2047)",
     'bool': "tinyint",
     'datetime': "datetime",
-    'JSONable': "JSON"
+    'jsonable': "json"
     }
 
     def connect_to_db(self):
@@ -1637,7 +1636,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     query += "'" + str(rows[k][j]) + "',"
                 elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
-                elif "JSON" in self.types[j + start_index]:
+                elif "json" in self.types[j + start_index]:
                     query += f"'{rows[k][j]}', "
 
 
@@ -1741,7 +1740,7 @@ class XlsxDB(AbstractDB):
         'dict': "str",
         'bool': "bool",
         'datetime': "datetime",
-        'JSONable': "str"
+        'jsonable': "str"
         }
 
         """
