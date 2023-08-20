@@ -478,7 +478,7 @@ class Mysqldb(AbstractDB):
     'dict': "nvarchar(2047)",
     'bool': "tinyint",
     'datetime': "datetime",
-    'jsonable': "json"
+    'Jsonable': "json"
     }
 
     def connect_to_db(self):
