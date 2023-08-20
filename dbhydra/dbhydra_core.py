@@ -5,10 +5,10 @@ import math
 import sys
 import threading
 from contextlib import contextmanager
-from copy import copy
+#from copy import copy
 from sys import platform
 import os
-from pathlib import Path
+import pathlib
 from typing import Any, Optional
 
 import numpy as np
@@ -771,7 +771,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     def __init__(self, db1, name, columns = None, types: Optional[list[str]] = None, id_column_name: str = "id"):
         """id_column_name -> name of predefined column with autoincrement + PK"""
         super().__init__(db1, name, columns)
-        self.types: list[str] = [] if types is None else types
+        self.types: list[str] = types #[] if types is None else types - is wrong, if types not initialized it should be None, not empty list
         self.id_column_name: str = id_column_name
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
@@ -811,19 +811,15 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if not len(update_df) == 1:
             raise ValueError("There can only be one row in the UPDATE dataframe")
 
-        column_types_without_uid = copy(self.types)
-        try:
-            column_types_without_uid = column_types_without_uid.remove(self.id_column_name)
-        except ValueError:
-            pass
+        types_without_id_column = [x for x in self.types if x!=self.id_column_name]
         
-        if len(column_types_without_uid) != len(update_df.columns):
+        if len(types_without_id_column) != len(update_df.columns):
             raise AttributeError(
                 "Number of columns in dataframe does not match number of columns in table"
             )
 
         column_value_string = ""
-        for (column, cell_value), column_type in zip(update_df.iloc[0].items(), column_types_without_uid):
+        for (column, cell_value), column_type in zip(update_df.iloc[0].items(), types_without_id_column):
             if cell_value is None:
                 column_value_string += f"{column} = NULL, "
             elif column_type in ["double", "int", "tinyint"]:
@@ -1723,14 +1719,20 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
 
 class XlsxDB(AbstractDB):
-    def __init__(self, config_file="config.ini", db_details=None, db_directory_path: Path = Path("database")):
+    def __init__(self, config_file="config.ini", db_details=None):
         if db_details is None:
             self.name="new_db"
+            self.directory_path = None
         else:
             self.name = db_details.get("DB_DATABASE")
-        self.lock = threading.Lock()
-        self.db_directory_path = db_directory_path
+            self.db_directory_path = db_details.get("DB_DIRECTORY")
 
+        self.lock = threading.Lock()
+                
+        if self.db_directory_path is None:
+            self.db_directory_path = pathlib.Path(self.name) 
+            
+            
         self.python_database_type_mapping = {
         'int': "int",
         'float': "double",
@@ -1811,12 +1813,12 @@ class XlsxTable(AbstractTable):
         super().__init__(db1, name, columns)
         self.types = types
         self.id_column_name=id_column_name
-        self.db_path: Path = self.db1.db_directory_path / f"{self.name}.xlsx"
+        self.table_directory_path: pathlib.Path = self.db1.db_directory_path / f"{self.name}.xlsx"
 
     def create(self):
-        if not self.db_path.exists():
+        if not self.table_directory_path.exists():
             df=pd.DataFrame(columns=self.columns)
-            df.to_excel(self.db_path, index=False)
+            df.to_excel(self.table_directory_path, index=False)
         else:
             print(f"Table '{self.name}' already exists")
 
@@ -1825,7 +1827,7 @@ class XlsxTable(AbstractTable):
 
     def select_to_df(self):
         try:
-            df = pd.read_excel(self.db_path)
+            df = pd.read_excel(self.table_directory_path)
             # cols=df.columns
             # print(cols)
             # df.set_index(cols[0],inplace=True)
@@ -1863,15 +1865,15 @@ class XlsxTable(AbstractTable):
             return (result_df)
 
         df = concat_with_reset_index_in_second_df(original_df, df)
-        df["uid"]=df.index
-        df = df.reindex(columns=["uid"]+df.columns[:-1].tolist()) #uid as a first column
+        df[self.id_column_name]=df.index
+        df = df.reindex(columns=[self.id_column_name]+df.columns[:-1].tolist()) #uid as a first column
         df.reset_index(drop=True,inplace=True)
-        df.to_excel(self.db_path, index=False)
+        df.to_excel(self.table_directory_path, index=False)
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
         #df.drop(df.columns[0], axis=1, inplace=True)
-        df.to_excel(self.db_path, index=False)
+        df.to_excel(self.table_directory_path, index=False)
 
     # def update(self, variable_assign: str, where: Optional[str] = None):
     #     def split_assign(variable_assign):
@@ -1925,7 +1927,7 @@ class XlsxTable(AbstractTable):
         columns_to_update = [pair[0] for pair in column_value_pairs]
         values_to_update = [pair[1] for pair in column_value_pairs]
         df.loc[df[where_column] == where_value, columns_to_update] = values_to_update
-        df.to_excel(self.db_path, index=False)
+        df.to_excel(self.table_directory_path, index=False)
 
     def update_from_df(self, update_df: pd.DataFrame, where_column: str, where_value: Any) -> None:
         """Update the xlsx file with the provided dataframe.
@@ -1942,7 +1944,7 @@ class XlsxTable(AbstractTable):
 
         table_df = self.select_to_df()
         table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df
-        table_df.to_excel(self.db_path, index=False)
+        table_df.to_excel(self.table_directory_path, index=False)
 
     def delete(self, where=None) -> Optional[int]:
         def split_assign(variable_assign):
@@ -1955,14 +1957,14 @@ class XlsxTable(AbstractTable):
             return (variable, value)
 
         df = self.select_to_df()
-        before_delete_count = len(df)
+        number_of_records = len(df)
         if where is None:
             df = df.iloc[0:0]
-            deleted_count = before_delete_count - 0
+            deleted_count = number_of_records
         else:
             where_variable, where_value = split_assign(where)
             df.drop(df[df[where_variable] == where_value].index, inplace=True)
-            deleted_count = before_delete_count - len(df)
+            deleted_count = number_of_records - len(df)
         self.replace_from_df(df)
         return deleted_count
 
