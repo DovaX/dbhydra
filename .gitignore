@@ -1,9 +1,7 @@
 plots/
 vars.kpv
-requirements.txt
 *.csv
 *.xml
-*.txt
 *.xlsx
 *.pickle
 *.flpl
