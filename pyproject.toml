@@ -1,0 +1,37 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+# POTENTIAL FUTURE MYPY CONFIG
+check_untyped_defs = true
+disallow_any_unimported = false
+disallow_untyped_defs = true
+exclude = ["venv", "venv_dev", "venv_prod", "migrations"]
+ignore_missing_imports = false
+ignore_missing_imports_per_module = false
+no_implicit_optional = false
+python_version = 3.9
+show_error_codes = true
+warn_return_any = false
+warn_unused_configs = true
+
+# NOT IN FINAL STATE - WORK IN PROGRESS
+[tool.ruff]
+extend-exclude = ["venv", "venv_dev", "venv_prod"]
+fix = false
+ignore = ["E501", "D100", "D101", "D102", "D105", "D106", "D107", "D203"]
+line-length = 100
+select = ["E", "F", "B", "I", "W", "N", "D", "UP", "A", "C4", "PT"]
+show-fixes = true
+target-version = "py39"
+
+# NOT IN FINAL STATE - WORK IN PROGRESS
+[tool.yapf]
+BASED_ON_STYLE = "google"
+BLANK_LINE_BEFORE_NESTED_CLASS_OR_DEF = false
+COLUMN_LIMIT = 100
+DEDENT_CLOSING_BRACKETS = true
+EACH_DICT_ENTRY_ON_SEPARATE_LINE = false
+SPLIT_ARGUMENTS_WHEN_COMMA_TERMINATED = true
+SPLIT_BEFORE_NAMED_ASSIGNS = false
+SPLIT_COMPLEX_COMPREHENSION = false

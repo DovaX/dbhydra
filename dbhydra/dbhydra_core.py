@@ -1,11 +1,9 @@
-"""DB Hydra ORM"""
 import abc
 import json
 import math
 import sys
 import threading
 from contextlib import contextmanager
-#from copy import copy
 from sys import platform
 import os
 import pathlib
@@ -811,8 +809,9 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if not len(update_df) == 1:
             raise ValueError("There can only be one row in the UPDATE dataframe")
 
-        types_without_id_column = [x for x in self.types if x!=self.id_column_name]
-        
+        types_without_id_column = [type_ for column, type_ in zip(self.columns, self.types) 
+                                   if column != self.id_column_name]
+
         if len(types_without_id_column) != len(update_df.columns):
             raise AttributeError(
                 "Number of columns in dataframe does not match number of columns in table"
@@ -826,7 +825,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
                 column_value_string += f"{column} = {cell_value}, "
             elif "varchar" in column_type:
                 column_value_string += f"{column} = '{cell_value}', "
-            elif column_type in ["JSON", "text", "mediumtext", "longtext", "datetime"]:
+            elif column_type in ["json", "text", "mediumtext", "longtext", "datetime"]:
                 column_value_string += f"{column} = '{cell_value}', "
             else:
                 raise AttributeError(f"Unknown column type '{column_type}'")
