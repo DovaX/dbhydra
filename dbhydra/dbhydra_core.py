@@ -466,7 +466,7 @@ class Jsonable(str):
 
 
 class Mysqldb(AbstractDB):
-    def __init__(self, config_file="config.ini", db_details=None, global_: bool = False):
+    def __init__(self, config_file="config.ini", db_details=None, global_: bool = False, *args, **kwargs):
         super().__init__(config_file, db_details)
         if global_:
             self.connect_to_db_globally()
@@ -1723,7 +1723,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
 
 class XlsxDB(AbstractDB):
-    def __init__(self, config_file="config.ini", db_details=None):
+    def __init__(self, config_file="config.ini", db_details=None, *args, **kwargs):
         if db_details is None:
             self.name="new_db"
             self.directory_path = None
