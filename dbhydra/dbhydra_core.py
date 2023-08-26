@@ -289,6 +289,7 @@ class AbstractDB(abc.ABC):
 
         self.lock = threading.Lock()
 
+        # NOTE: Pointless call (?): This is simply returning ContextManager object as `self.connect_to_db()` is a contextmanager decorated
         self.connect_to_db()
 
     @abc.abstractmethod
@@ -465,6 +466,10 @@ class Jsonable(str):
 
 
 class Mysqldb(AbstractDB):
+    def __init__(self, config_file="config.ini", db_details=None, global_: bool = False):
+        super().__init__(config_file, db_details)
+        if global_:
+            self.connect_to_db_globally()
 
     python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
     {
@@ -479,17 +484,17 @@ class Mysqldb(AbstractDB):
     'Jsonable': "json"
     }
 
-    def connect_to_db(self):
+    def connect_to_db_globally(self):
+        """Connect to the DB globally (not as a ContextManager)"""
         self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
 
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
+
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME,
