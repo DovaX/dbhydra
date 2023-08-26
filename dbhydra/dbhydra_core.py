@@ -250,6 +250,7 @@ class AbstractDB(abc.ABC):
         'Set': 'set',
         'Union': 'object',
         'Optional': 'object',
+        'Jsonable': 'Jsonable',
         # 'FrozenSet': frozenset,
         # 'Deque': list,
         # 'Any': object,
@@ -1746,7 +1747,7 @@ class XlsxDB(AbstractDB):
         'dict': "str",
         'bool': "bool",
         'datetime': "datetime",
-        'jsonable': "str"
+        'Jsonable': "str"
         }
 
         """
