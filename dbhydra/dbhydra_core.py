@@ -1,12 +1,15 @@
 """DB Hydra ORM"""
 import abc
-import ast
 import json
 import math
 import sys
 import threading
 from contextlib import contextmanager
+#from copy import copy
 from sys import platform
+import os
+import pathlib
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -45,7 +48,7 @@ POSTGRES_TO_MYSQL_DATA_MAPPING = {
 PYTHON_TO_MYSQL_DATA_MAPPING = {
     'int': "int",
     'float': "double",
-    'str': "varchar(255)",
+    'str': "nvarchar(2047)",
     'bool': "bit",
     'datetime': "datetime"
 }
@@ -249,6 +252,7 @@ class AbstractDB(abc.ABC):
         'Set': 'set',
         'Union': 'object',
         'Optional': 'object',
+        'Jsonable': 'Jsonable',
         # 'FrozenSet': frozenset,
         # 'Deque': list,
         # 'Any': object,
@@ -459,22 +463,28 @@ class db(AbstractDB):
         return (foreign_keys)
 
 
+class Jsonable(str):
+    pass
+
+
 class Mysqldb(AbstractDB):
 
     python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
     {
     'int': "int",
     'float': "double",
-    'str': "varchar(255)",
-    'list': "varchar(255)",
-    'dict': "varchar(255)",
+    'str': "nvarchar(2047)",
+    'tuple': "json",
+    'list': "nvarchar(2047)",
+    'dict': "nvarchar(2047)",
     'bool': "tinyint",
-    'datetime': "datetime"
+    'datetime': "datetime",
+    'Jsonable': "json"
     }
 
-    def connect_to_db(self):
-        self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
-        self.cursor = self.connection.cursor()
+    #def connect_to_db(self):
+    #    self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
+    #    self.cursor = self.connection.cursor()
 
     # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
@@ -759,15 +769,22 @@ class Joinable(Selectable):
 
 
 class AbstractTable(AbstractJoinable, abc.ABC):
-    def __init__(self, db1, name, columns=None, types=None):
+    def __init__(self, db1, name, columns = None, types: Optional[list[str]] = None, id_column_name: str = "id"):
+        """id_column_name -> name of predefined column with autoincrement + PK"""
         super().__init__(db1, name, columns)
-        self.types = types
+        self.types: list[str] = types #[] if types is None else types - is wrong, if types not initialized it should be None, not empty list
+        self.id_column_name: str = id_column_name
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
-    def init_from_column_type_dict(db1, name, column_type_dict):
-        pass
-
+    @classmethod
+    def init_from_column_type_dict(cls, db1, name, column_type_dict, id_column_name="id"):
+        column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
+        columns = list(column_converted_type_dict.keys())
+        types = list(column_converted_type_dict.values())
+        return cls(db1, name, columns, types, id_column_name=id_column_name)
+    
+    
     def drop(self):
         query = "DROP TABLE " + self.name
         print(query)
@@ -780,6 +797,51 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
         print(query)
         return self.db1.execute(query)
+
+    def update_from_df(
+            self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None) -> None:
+        """Build UPDATE SQL query from a dataframe and execute it.
+
+        :param update_df: Dataframe with updated values - MUST only hold a single row
+        :type update_df: pd.DataFrame
+        :param where_column: Column name to use for WHERE clause.
+        :type where_column: str
+        :param where_value: Value to use for WHERE clause.
+        :type where_value: Any
+        """
+        if not len(update_df) == 1:
+            raise ValueError("There can only be one row in the UPDATE dataframe")
+
+        types_without_id_column = [type_ for column, type_ in zip(self.columns, self.types) 
+                           if column != self.id_column_name]
+        if len(types_without_id_column) != len(update_df.columns):
+            raise AttributeError(
+                "Number of columns in dataframe does not match number of columns in table"
+            )
+
+        column_value_string = ""
+        for (column, cell_value), column_type in zip(update_df.iloc[0].items(), types_without_id_column):
+            if cell_value is None:
+                column_value_string += f"{column} = NULL, "
+            elif column_type in ["double", "int", "tinyint"]:
+                column_value_string += f"{column} = {cell_value}, "
+            elif "varchar" in column_type:
+                column_value_string += f"{column} = '{cell_value}', "
+            elif column_type in ["json", "text", "mediumtext", "longtext", "datetime"]:
+                column_value_string += f"{column} = '{cell_value}', "
+            else:
+                raise AttributeError(f"Unknown column type '{column_type}'")
+
+        column_value_string = column_value_string.rstrip(", ")
+        sql_query = f"UPDATE {self.name} SET {column_value_string}"
+
+        if where_column is not None and where_value is not None:
+            sql_query += f" WHERE {where_column} = {where_value};"
+        else:
+            sql_query += ";"
+
+        print(sql_query)
+        self.db1.execute(sql_query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
@@ -830,7 +892,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             assert len(df.columns) + 1 == len(self.columns) # +1 because of id column
             
             inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
-            id_index=inserted_columns.index("id")
+            id_index=inserted_columns.index(self.id_column_name)
             inserted_columns.pop(id_index)
             print(inserted_columns,df.columns)
             
@@ -937,10 +999,10 @@ class PostgresTable(AbstractTable):
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
-        if "id" in columns:
-            id_col_index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            id_col_index = columns.index(temporary_table.id_column_name)
             columns.pop(id_col_index)
-            columns.insert(0, "id")
+            columns.insert(0, temporary_table.id_column_name)
             types.pop(id_col_index)
             types.insert(0, "int")
 
@@ -949,9 +1011,9 @@ class PostgresTable(AbstractTable):
     # @save_migration
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int" or self.types[0].lower() == "integer"
-        query = "CREATE TABLE " + self.name + "(id SERIAL PRIMARY KEY,"
+        query = "CREATE TABLE " + self.name + "("+self.id_column_name+" SERIAL PRIMARY KEY,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
 
@@ -966,9 +1028,7 @@ class PostgresTable(AbstractTable):
 
     def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
         start_index = 0 if insert_id else 1
-        print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
-        print(self.types)
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
@@ -1199,12 +1259,12 @@ class MongoTable():
         columns = values[0][1:]
         types = values[1][1:]
 
-        if "id" in columns:
-            index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            index = columns.index(temporary_table.id_column_name)
             columns.pop(index)
             types.pop(index)
 
-        columns.insert(0, "id")
+        columns.insert(0, temporary_table.id_column_name)
         types.insert(0, "int")
         types = [x.lower() for x in types]
         types_ = [PYTHON_TO_MYSQL_DATA_MAPPING[x] for x in types]
@@ -1303,12 +1363,12 @@ class Table(Joinable, AbstractTable):
 
     def create(self):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
-        query = "CREATE TABLE " + self.name + "(id INT IDENTITY(1,1) NOT NULL,"
+        query = "CREATE TABLE " + self.name + "("+self.id_column_name+" INT IDENTITY(1,1) NOT NULL,"
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
-        query += "PRIMARY KEY(id))"
+        query += "PRIMARY KEY("+self.id_column_name+"))"
 
         print(query)
         try:
@@ -1395,16 +1455,18 @@ class Table(Joinable, AbstractTable):
 
 
 class MysqlTable(MysqlSelectable, AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns)
         self.types = types
+        self.id_column_name = id_column_name
 
-    @classmethod
-    def init_from_column_type_dict(cls, db1, name, column_type_dict):
-        column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
-        columns = list(column_converted_type_dict.keys())
-        types = list(column_converted_type_dict.values())
-        return cls(db1, name, columns, types)
+    #Disabled because it is inherited
+    # @classmethod
+    # def init_from_column_type_dict(cls, db1, name, column_type_dict, id_column_name="id"):
+    #     column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
+    #     columns = list(column_converted_type_dict.keys())
+    #     types = list(column_converted_type_dict.values())
+    #     return cls(db1, name, columns, types, id_column_name=id_column_name)
 
     def initialize_columns(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
@@ -1437,8 +1499,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     """
         Returns a list of data types, where each element represents the category of the data ('varchar', 'int', etc.). 
         If a data type has an associated length, the length value will be included in a corresponding element of the
-        data_lengths list, otherwise the element will have a None value. For example, 'varchar(255)' would return
-        'varchar' in the data_types list and 255 in the data_lengths list.
+        data_lengths list, otherwise the element will have a None value. For example, 'nvarchar(2047)' would return
+        'varchar' in the data_types list and 2047 in the data_lengths list.
     """
     def get_data_types_and_character_lengths(self):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
@@ -1475,10 +1537,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
-        if "id" in columns:
-            id_col_index = columns.index("id")
+        if temporary_table.id_column_name in columns:
+            id_col_index = columns.index(temporary_table.id_column_name)
             columns.pop(id_col_index)
-            columns.insert(0, "id")
+            columns.insert(0, temporary_table.id_column_name)
             types.pop(id_col_index)
             types.insert(0, "int")
 
@@ -1491,7 +1553,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         Returns the biggest id from table
         """
 
-        last_id = self.select(f"SELECT id FROM {self.name} ORDER BY id DESC LIMIT 1;")
+        last_id = self.select(f"SELECT {self.id_column_name} FROM {self.name} ORDER BY {self.id_column_name} DESC LIMIT 1;")
 
         return last_id[0][0]
 
@@ -1512,14 +1574,14 @@ class MysqlTable(MysqlSelectable, AbstractTable):
     # @save_migration #TODO: Uncomment
     def create(self, foreign_keys=None):
         assert len(self.columns) == len(self.types)
-        assert self.columns[0] == "id"
+        assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
 
         column_type_pairs = list(zip(self.columns, self.types))[1:]
         fields = ", ".join(
             [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
         )
-        query = f"CREATE TABLE {self.name} (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
+        query = f"CREATE TABLE {self.name} ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -1530,9 +1592,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
         start_index = 0 if insert_id else 1
-        print("INSERTING!!!")
         assert len(self.columns) == len(self.types)
-        print(self.types)
+        total_output=[]
         for k in range(len(rows)):
             if k % batch == 0:
                 query = "INSERT INTO " + self.name + " ("
@@ -1572,7 +1633,8 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     query += "'" + str(rows[k][j]) + "',"
                 elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
-
+                elif "json" in self.types[j + start_index]:
+                    query += f"'{rows[k][j]}', "
 
 
                 else:
@@ -1588,10 +1650,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                     print(query)
 
                 if not try_mode:
-                    return self.db1.execute(query)
+                    output=self.db1.execute(query)
+                    total_output.append(output)
                 else:
                     try:
-                        return self.db1.execute(query)
+                        output=self.db1.execute(query)
+                        total_output.append(output)
                     except Exception as e:
 
                         print("Query", query, "Could not be inserted:", e)
@@ -1600,6 +1664,12 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                         if debug_mode:
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
+            
+            elif len(total_output)==1:
+                return(total_output[0])
+            else:
+                return(total_output)
+                
 
     def add_foreign_key(self, foreign_key):
         parent_id = foreign_key['parent_id']
@@ -1607,7 +1677,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
         print(query)
         self.db1.execute(query)
-        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "(id)"
+        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
         print(query)
         self.db1.execute(query)
 
@@ -1649,9 +1719,33 @@ class MysqlTable(MysqlSelectable, AbstractTable):
             print("Cant modify column to table.")
 
 
-class XlsxDB:
-    def __init__(self, name="new_db", config_file="config.ini"):
-        self.name = name
+class XlsxDB(AbstractDB):
+    def __init__(self, config_file="config.ini", db_details=None):
+        self.locally=True
+        if db_details is None:
+            self.name="new_db"
+            self.directory_path = None
+        else:
+            self.name = db_details.get("DB_DATABASE")
+            self.db_directory_path = db_details.get("DB_DIRECTORY")
+
+        self.lock = threading.Lock()
+                
+        if self.db_directory_path is None:
+            self.db_directory_path = pathlib.Path(self.name) 
+            
+            
+        self.python_database_type_mapping = {
+        'int': "int",
+        'float': "double",
+        'str': "str",
+        'tuple': "str",
+        'list': "str",
+        'dict': "str",
+        'bool': "bool",
+        'datetime': "datetime",
+        'Jsonable': "str"
+        }
 
         """
         db_details=read_connection_details(config_file)
@@ -1672,6 +1766,31 @@ class XlsxDB:
             self.DB_PASSWORD = db_details["DB_PASSWORD"]
             self.connect_remotely()
         """
+        
+        class DummyXlsxConnection: #compatibility with MySQL connection
+            def begin(*args):
+                pass
+            def commit(*args):
+                pass
+            def rollback(*args):
+                pass
+            
+        class DummyXlsxCursor: #compatibility with MySQL connection
+            def execute(*args):    
+                pass
+            
+            def fetchall(*args):
+                pass
+            
+        self.cursor=DummyXlsxCursor()
+        self.connection=DummyXlsxConnection()
+        self.create_database()
+        
+    def connect_locally(self):
+        pass #no real connection
+        
+    def connect_remotely(self):
+        pass #no real connection
 
     def execute(self, query):
         pass
@@ -1684,27 +1803,38 @@ class XlsxDB:
         # print("DB connection closed")
 
     def create_database(self):
-        import os
         try:
-            os.mkdir(self.name)
-            print("Database created")
-        except:
-            print("Database is already created")
+            os.mkdir(self.db_directory_path)
+            print("Database directory created")
+        except FileExistsError:
+            print("Database directory already exists")
 
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None):
+    def __init__(self, db1: XlsxDB, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns)
         self.types = types
+        self.id_column_name=id_column_name
+        self.table_directory_path: pathlib.Path = self.db1.db_directory_path / f"{self.name}.xlsx"
+
+    def create(self):
+        if not self.table_directory_path.exists():
+            df=pd.DataFrame(columns=self.columns)
+            df.to_excel(self.table_directory_path, index=False)
+        else:
+            print(f"Table '{self.name}' already exists")
+
+    def drop(self):
+        pass
 
     def select_to_df(self):
         try:
-            df = pd.read_excel(self.db1.name + "//" + self.name + ".xlsx")
+            df = pd.read_excel(self.table_directory_path)
             # cols=df.columns
             # print(cols)
             # df.set_index(cols[0],inplace=True)
             # df.drop(df.columns[0],axis=1,inplace=True)
-
+            df.replace({np.nan: None}, inplace=True)
         except Exception as e:
             print("Error: ", e)
             df = pd.DataFrame(columns=self.columns)
@@ -1715,35 +1845,110 @@ class XlsxTable(AbstractTable):
 
         original_df = self.select_to_df()
 
+        original_df.index=original_df[self.id_column_name]
         try:
             original_df = original_df.drop(original_df.columns[0], axis=1)
         except:
             print("First column could not be dropped")
 
-        df.columns = original_df.columns
         # handling nan values -> change to NULL TODO
         for column in list(df.columns):
-            df.loc[pd.isna(df[column]), column] = "NULL"
+            df.loc[pd.isna(df[column]), column] = None
 
         def concat_with_reset_index_in_second_df(original_df, df):
             """Subsitute of reset_index method because we need to maintain the ids of original df"""
-            maximal_index = max(original_df.index)
+            if len(original_df.index)>0:
+                maximal_index = max(original_df.index)
+            else:
+                maximal_index=0
             df.index = df.index + maximal_index + 1
-            original_df = original_df.append(df)
-            # df=pd.concat([original_df,df])
-            return (original_df)
+            df.reindex(columns=original_df.columns.tolist()) #to ensure that columns get correctly inserted
+            result_df = pd.concat([original_df,df])
+            return (result_df)
 
-        if len(original_df) > 0:
-            df = concat_with_reset_index_in_second_df(original_df, df)
-
-        df.to_excel(self.db1.name + "\\" + self.name + ".xlsx")
+        df = concat_with_reset_index_in_second_df(original_df, df)
+        df[self.id_column_name]=df.index
+        df = df.reindex(columns=[self.id_column_name]+df.columns[:-1].tolist()) #uid as a first column
+        df.reset_index(drop=True,inplace=True)
+        df.to_excel(self.table_directory_path, index=False)
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
-        df.drop(df.columns[0], axis=1, inplace=True)
-        df.to_excel(self.db1.name + "\\" + self.name + ".xlsx")
+        #df.drop(df.columns[0], axis=1, inplace=True)
+        df.to_excel(self.table_directory_path, index=False)
 
-    def update(self, variable_assign, where=None):
+    # def update(self, variable_assign: str, where: Optional[str] = None):
+    #     def split_assign(variable_assign):
+    #         variable = variable_assign.split("=")[0]
+    #         value = variable_assign.split("=")[1]
+    #         try:
+    #             value = int(value)  # integers
+    #         except:
+    #             value = value.split("'")[1]  # strings
+    #         return (variable, value)
+
+    #     variable, value = split_assign(variable_assign)
+    #     df = self.select_to_df()
+    #     print(where)
+    #     print(variable, value)
+    #     if where is None:
+    #         df[variable] = value
+    #         print(df)
+    #     else:
+    #         where_variable, where_value = split_assign(where)
+    #         df[variable] = df[where_variable].apply(lambda x: value if str(x) == str(where_value) else x) #
+    #     self.replace_from_df(df)
+
+    def update(self, sql_column_update_string: str, sql_where_string: str) -> None:
+        """Decompose provided parts of SQL UPDATE statement and update the xlsx file accordingly.
+
+        TODO: Very fragile, unintuitive, and error-prone. Should be replaced with update_from_df().
+        BUG: This will fail spectacularly on any values containing ',' in a
+        `sql_column_update_string` or `sql_where_string'
+
+        :param sql_column_update_string: e.g. "project_key='jakubatforloop.ai', project_name='Untitled Project'
+        :type sql_column_update_string: str
+        :param sql_where_string: e.g. "uid='1'"
+        :type sql_where_string: str
+        """
+
+        # "project_key='jakubatforloop.ai', project_name='Untitled Project', last_active_pipeline_uid='1'"
+        column_value_strings = sql_column_update_string.split(",")
+        # ["project_key='jakubatforloop.ai'", " project_name='Untitled Project'", " last_active_pipeline_uid='1'"]
+        column_value_pairs = [pair.split("=") for pair in column_value_strings]
+        # [['project_key', "'jakubatforloop.ai'"], [' project_name', "'Untitled Project'"], [' last_active_pipeline_uid', "'1'"]]
+        column_value_pairs = [
+            [column.strip(' "\''), value.strip(' "\'')] for column, value in column_value_pairs
+        ]
+        # [['project_key', 'jakubatforloop.ai'], ['project_name', 'Untitled Project'], ['last_active_pipeline_uid', '1']]
+
+        where_column, where_value = sql_where_string.split("=")
+        where_value = where_value.strip(' "\'')
+
+        df = self.select_to_df()
+        columns_to_update = [pair[0] for pair in column_value_pairs]
+        values_to_update = [pair[1] for pair in column_value_pairs]
+        df.loc[df[where_column] == where_value, columns_to_update] = values_to_update
+        df.to_excel(self.table_directory_path, index=False)
+
+    def update_from_df(self, update_df: pd.DataFrame, where_column: str, where_value: Any) -> None:
+        """Update the xlsx file with the provided dataframe.
+
+        :param update_df: Dataframe with updated values - MUST only hold a single row
+        :type update_df: pd.DataFrame
+        :param where_column: Column name to use for WHERE clause.
+        :type where_column: str
+        :param where_value: Value to use for WHERE clause.
+        :type where_value: Any
+        """
+        if not len(update_df) == 1:
+            raise ValueError("There can only be one row in the UPDATE dataframe")
+
+        table_df = self.select_to_df()
+        table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df
+        table_df.to_excel(self.table_directory_path, index=False)
+
+    def delete(self, where=None) -> Optional[int]:
         def split_assign(variable_assign):
             variable = variable_assign.split("=")[0]
             value = variable_assign.split("=")[1]
@@ -1753,37 +1958,17 @@ class XlsxTable(AbstractTable):
                 value = value.split("'")[1]  # strings
             return (variable, value)
 
-        variable, value = split_assign(variable_assign)
         df = self.select_to_df()
-        print(where)
-        print(variable, value)
-        if where is None:
-            df[variable] = value
-            print(df)
-        else:
-            where_variable, where_value = split_assign(where)
-            df[variable] = df[where_variable].apply(lambda x: value if x == where_value else x)
-        self.replace_from_df(df)
-
-    def delete(self, where=None):
-        def split_assign(variable_assign):
-            variable = variable_assign.split("=")[0]
-            value = variable_assign.split("=")[1]
-            try:
-                value = int(value)  # integers
-            except:
-                value = value.split("'")[1]  # strings
-            return (variable, value)
-
-        df = self.select_to_df()
+        number_of_records = len(df)
         if where is None:
             df = df.iloc[0:0]
-            print(df)
+            deleted_count = number_of_records
         else:
             where_variable, where_value = split_assign(where)
             df.drop(df[df[where_variable] == where_value].index, inplace=True)
+            deleted_count = number_of_records - len(df)
         self.replace_from_df(df)
-
+        return deleted_count
 
 # dataframe - dictionary auxiliary functions
 def df_to_dict(df, column1, column2):
@@ -1798,18 +1983,18 @@ def dict_to_df(dictionary, column1, column2):
 
 class AbstractModel(abc.ABC, BaseModel):
     @classmethod
-    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name):
-        column_type_dict = create_table_structure_dict(cls)
-        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict)
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id"):
+        column_type_dict = create_table_structure_dict(cls, id_column_name=id_column_name)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name)
         return dbhydra_table
 
  
 
-def create_table_structure_dict(api_class_instance):
+def create_table_structure_dict(api_class_instance, id_column_name="id"):
     """
     Accepts instance of API data class (e.g. APIDatabase) and converts it to dictionary {attribute_name: attribute_type}
     """
-    table_structure_dict = {"id": "int"}
+    table_structure_dict = {id_column_name: "int"}
     table_structure_dict = {**table_structure_dict,
                             **{attribute_name: attribute_type.__name__ for attribute_name, attribute_type in api_class_instance.__annotations__.items()}}
 
