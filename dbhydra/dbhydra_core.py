@@ -481,9 +481,9 @@ class Mysqldb(AbstractDB):
     'Jsonable': "json"
     }
 
-    def connect_to_db(self):
-        self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
-        self.cursor = self.connection.cursor()
+    #def connect_to_db(self):
+    #    self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
+    #    self.cursor = self.connection.cursor()
 
     # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
@@ -1720,6 +1720,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
 class XlsxDB(AbstractDB):
     def __init__(self, config_file="config.ini", db_details=None):
+        self.locally=True
         if db_details is None:
             self.name="new_db"
             self.directory_path = None
