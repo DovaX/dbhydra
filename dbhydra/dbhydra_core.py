@@ -1834,7 +1834,14 @@ class XlsxTable(AbstractTable):
             print(f"Table '{self.name}' already exists")
 
     def drop(self):
-        pass
+        if self.table_directory_path.exists():
+            if sys.platform in ["darwin","linux","linux2"]:
+                command="rm "+str(self.table_directory_path)
+            else:
+                command="del "+str(self.table_directory_path)
+            os.system(command)
+        
+
 
     def select_to_df(self):
         try:
