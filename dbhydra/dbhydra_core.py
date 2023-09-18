@@ -482,17 +482,12 @@ class Mysqldb(AbstractDB):
     'Jsonable': "json"
     }
 
-    #def connect_to_db(self):
-    #    self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
-    #    self.cursor = self.connection.cursor()
-
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
+
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME,
