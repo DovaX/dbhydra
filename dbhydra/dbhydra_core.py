@@ -482,17 +482,12 @@ class Mysqldb(AbstractDB):
     'Jsonable': "json"
     }
 
-    #def connect_to_db(self):
-    #    self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, password=self.DB_PASSWORD, database=self.DB_DATABASE)
-    #    self.cursor = self.connection.cursor()
-
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
     def connect_locally(self):
         self.connection = MySQLdb.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)
         self.cursor = self.connection.cursor()
         print("DB connection established")
-    # NOT USED, BUT FORCED BY ABSTRACT CLASS
+
     def connect_remotely(self):
         if self.DB_PORT is not None:
             self.connection = MySQLdb.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME,
@@ -1844,12 +1839,14 @@ class XlsxTable(AbstractTable):
 
 
     def select_to_df(self):
+        # String must be typed with 'object' otherwise they get parsed arbitrarily and
+        # then cast to string, e.g. 'true' -> True -> 'True'
+        column_type_map = {
+            column: object for column, type_ in zip(self.columns, self.types) if type_ == "str"
+        }
+
         try:
-            df = pd.read_excel(self.table_directory_path)
-            # cols=df.columns
-            # print(cols)
-            # df.set_index(cols[0],inplace=True)
-            # df.drop(df.columns[0],axis=1,inplace=True)
+            df = pd.read_excel(self.table_directory_path, dtype=column_type_map)
             df.replace({np.nan: None}, inplace=True)
         except Exception as e:
             print("Error: ", e)
@@ -1867,7 +1864,7 @@ class XlsxTable(AbstractTable):
         except:
             print("First column could not be dropped")
 
-        # handling nan values -> change to NULL TODO
+        # handling nan values -> change to NULL TODO  
         for column in list(df.columns):
             df.loc[pd.isna(df[column]), column] = None
 
