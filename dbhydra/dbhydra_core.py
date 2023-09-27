@@ -1728,7 +1728,7 @@ class XlsxDB(AbstractDB):
         self.locally=True
         if db_details is None:
             self.name="new_db"
-            self.directory_path = None
+            self.db_directory_path = None
         else:
             self.name = db_details.get("DB_DATABASE")
             self.db_directory_path = db_details.get("DB_DIRECTORY")
