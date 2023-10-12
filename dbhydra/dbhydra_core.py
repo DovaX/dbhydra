@@ -1958,7 +1958,7 @@ class XlsxTable(AbstractTable):
             raise ValueError("There can only be one row in the UPDATE dataframe")
 
         table_df = self.select_to_df()
-        table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df
+        table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df.values
         table_df.to_excel(self.table_directory_path, index=False)
 
     def delete(self, where=None) -> Optional[int]:
