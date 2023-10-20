@@ -809,6 +809,9 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
         types_without_id_column = [type_ for column, type_ in zip(self.columns, self.types) 
                            if column != self.id_column_name]
+        columns_without_id_column = [column for column in self.columns if column != self.id_column_name]
+        update_df = update_df.reindex(columns=columns_without_id_column)
+
         if len(types_without_id_column) != len(update_df.columns):
             raise AttributeError(
                 "Number of columns in dataframe does not match number of columns in table"
