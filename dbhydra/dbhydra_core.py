@@ -596,7 +596,6 @@ class BigQueryDb(AbstractDB):
         self.client.close()
 
     def select_to_df(self, query):
-        print(query)
         df = pd.read_gbq(query=query, project_id=self.project_id, credentials=self.credentials)
 
         return df
@@ -689,7 +688,6 @@ class AbstractSelectable:
     def select(self, query):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        print(query)
         self.db1.cursor.execute(query)
         column_string = query.lower().split("from")[0]
         if "*" in column_string:
@@ -742,7 +740,6 @@ class Selectable(AbstractSelectable):  # Tables, views, and results of joins
 class MysqlSelectable(AbstractSelectable):
     def select(self, query):
         """TODO"""
-        print(query)
         self.db1.execute(query)
         rows = self.db1.cursor.fetchall()
         return (rows)
@@ -782,7 +779,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     
     def drop(self):
         query = "DROP TABLE " + self.name
-        print(query)
         self.db1.execute(query)
 
     def update(self, variable_assign, where=None):
@@ -790,7 +786,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             query = "UPDATE " + self.name + " SET " + variable_assign
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
-        print(query)
         return self.db1.execute(query)
 
     def update_from_df(
@@ -1086,7 +1081,7 @@ class PostgresTable(AbstractTable):
                 query = query[:-1]
 
                 if debug_mode:
-                    print(query)
+                    pass
 
                 if not try_mode:
                     return self.db1.execute(query)
@@ -1163,7 +1158,7 @@ class BigQueryTable(AbstractSelectable):
 
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        print(query)
+        pass
         # rows =  self.db1.client.query(query).result()
         rows = self.db1.execute(query)
         return rows
@@ -1368,7 +1363,7 @@ class Table(Joinable, AbstractTable):
             query += self.columns[i] + " " + self.types[i] + ","
         query += "PRIMARY KEY("+self.id_column_name+"))"
 
-        print(query)
+        pass
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -1416,7 +1411,7 @@ class Table(Joinable, AbstractTable):
                 query = query[:-1]
 
                 if debug_mode:
-                    print(query)
+                    pass
 
                 if not try_mode:
                     self.db1.execute(query)
@@ -1566,7 +1561,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
 
     def drop(self):
         query = "DROP TABLE " + self.name + ";"
-        print(query)
+        pass
         self.db1.execute(query)
 
     # @save_migration #TODO: Uncomment
@@ -1581,7 +1576,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         )
         query = f"CREATE TABLE {self.name} ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
-        print(query)
+        pass
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -1654,7 +1649,7 @@ class MysqlTable(MysqlSelectable, AbstractTable):
                 query = query[:-1]
 
                 if debug_mode:
-                    print(query)
+                    pass
 
                 if not try_mode:
                     output=self.db1.execute(query)
@@ -1682,10 +1677,10 @@ class MysqlTable(MysqlSelectable, AbstractTable):
         parent_id = foreign_key['parent_id']
         parent = foreign_key['parent']
         query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
-        print(query)
+        pass
         self.db1.execute(query)
         query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
-        print(query)
+        pass
         self.db1.execute(query)
 
     @save_migration
