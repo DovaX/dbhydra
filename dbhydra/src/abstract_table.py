@@ -4,16 +4,6 @@ import numpy as np
 import abc
 
 
-class Query:
-    def __init__(self, query):
-        pass
-        
-        
-    
-    
-    
-
-
 class Select:
     def __init__(self, columns:list, table):
         self.columns=columns
@@ -24,20 +14,29 @@ class Select:
     
     
 class Insert:
-    def __init__(self,column_value_dict:dict, table):
+    def __init__(self, column_value_dict:dict, table):
         self.column_value_dict=column_value_dict
         self.table=table
+    
+    def __str__(self):
+        return("INSERT INTO "+self.table.name+" ("+",".join(list(self.columns_value_dict.keys()))+") VALUES "+",".join(list(self.columns_value_dict.values()))+")")
         
         
 class Update:
-    def __init__(self,column_value_dict:dict, table):
+    def __init__(self, column_value_dict:dict, table):
         self.column_value_dict=column_value_dict
         self.table=table
-        
+    def __str__(self):
+        return("UPDATE "+self.table.name+" SET ("+[str(k)+" = "+str(v) for k,v in self.columns_value_dict.items()])
+                
         
 class Delete:
     def __init__(self, table):
         self.table=table
+        
+    def __str__(self):
+        return("DELETE FROM "+self.table.name)
+        
         
 class Where:
     def __init__(self, column: str, value: Any, operator="="):
@@ -48,7 +47,13 @@ class Where:
     def __str__(self):
         return f"WHERE {self.column} {self.operator} {self.value}"
       
-  
+class ToDf:
+    def __init__(self):
+        pass
+    
+    def __str__(self):
+        return("")
+    
 
 # Tables
 class AbstractSelectable:
@@ -59,57 +64,65 @@ class AbstractSelectable:
         self.query_building_enabled=False
         self._query_blocks=[]
         
+        
+    def _get_selected_columns(self, query):
+        column_string = query.lower().split("from")[0]
+        if "*" in column_string:
+            columns = self.columns
+        elif column_string.find(",") == -1:
+            columns = [column_string.replace("select","").strip()]
+        else:
+            columns = [x.strip() for x in column_string.split(",")]
+        return(columns)
 
-    def select(self, query, flatten_results=False):
+
+    def _fetch_results(self, columns_count):
+        rows = self.db1.cursor.fetchall()
+        
+        def cast_rows_to_list_of_lists(rows, columns_count):
+            cleared_rows = []
+            for row in rows:  # Because of unhashable type: 'pyodbc.Row'
+                list1 = []
+                for i in range(columns_count):
+                    list1.append(row[i])
+                cleared_rows.append(list1)
+            return(cleared_rows)
+        
+        
+        
+        results=cast_rows_to_list_of_lists(rows, columns_count)
+        
+        return (results)
+
+
+    def select(self, query, flattening_of_results=False):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         
-        
-        def get_selected_columns(query):
-            column_string = query.lower().split("from")[0]
-            if "*" in column_string:
-                columns = self.columns
-            elif column_string.find(",") == -1:
-                columns = [column_string.replace("select","").strip()]
-            else:
-                columns = [x.strip() for x in column_string.split(",")]
-            return(columns)
-        
-        
+
         if self.query_building_enabled:
-            columns=get_selected_columns(query)
+            columns=self._get_selected_columns(query)
             self._query_blocks.append(Select(columns, self))
             return(self) #to enable chaining
         
         else:
             print(query)
             self.db1.cursor.execute(query)
-            rows = self.db1.cursor.fetchall()
-               
             
-            def cast_rows_to_list_of_lists(rows):
-                cleared_rows = []
-                for row in rows:  # Because of unhashable type: 'pyodbc.Row'
-                    list1 = []
-                    for i in range(columns_count):
-                        list1.append(row[i])
-                    cleared_rows.append(list1)
-                return(cleared_rows)
-            
-            def flatten_results(rows, columns_count):
-                """Returns flat list for one column and list of lists for multiple columns"""
+            columns_count=len(self._get_selected_columns(query))
+            rows=self._fetch_results(columns_count)
                 
-                    
+            def flatten_results(rows, columns_count):
+                """Returns flat list for one column and list of lists for multiple columns"""   
                 if columns_count == 1:
                     cleared_rows = [item[0] for item in rows]
-                
                 return(cleared_rows)
             
-            rows=cast_rows_to_list_of_lists(rows)
-            if flatten_results:
-                columns_count=len(get_selected_columns(query))
-                results=flatten_results(rows, columns_count)
-            return (results)
+            if flattening_of_results:
+                rows=flatten_results(rows, columns_count)
+                
+            return(rows)
+            
 
     def select_all(self):
         all_cols_query = ""
@@ -122,8 +135,12 @@ class AbstractSelectable:
 
     def select_to_df(self):
         rows = self.select_all()
-        table_columns = self.columns
-        df = pd.DataFrame(rows, columns=table_columns)
+        if self.query_building_enabled:
+            self.to_df()
+            df=None
+        else:
+            table_columns = self.columns
+            df = pd.DataFrame(rows, columns=table_columns)
         return (df)
 
     def export_to_xlsx(self, filename="items.xlsx"):
@@ -133,6 +150,10 @@ class AbstractSelectable:
         
     def where(self, column, value, operator="="):
         self._query_blocks.append(Where(column, value, operator))
+        return(self) #to enable chaining
+    
+    def to_df(self):
+        self._query_blocks.append(ToDf())
         return(self) #to enable chaining
         
     
@@ -147,19 +168,26 @@ class AbstractSelectable:
     
     def _build_queries_from_blocks(self):
         queries=[]
+        queries_destinations=[]
         grouped_blocks=[]
+        query_destination=None
+        
         for i,block in enumerate(self._query_blocks):
-            if type(block)!=Where:
+            if type(block)!=Where and type(block)!=ToDf:
                 grouped_blocks.append([block])
             else:
                 grouped_blocks[-1].append(block)
+                
+            if type(block)==ToDf:
+                query_destination="DF"
             
         for i, grouped_block in enumerate(grouped_blocks):
             query=self._construct_query_string_from_blocks(grouped_block)
             queries.append(query)
-            single_query_blocks=[block]
+            queries_destinations.append(query_destination)
             
-        return(queries)
+        assert len(queries) == len(queries_destinations)    
+        return(queries, queries_destinations)
     
     def execute(self, query=""):
         """passes execution to DB object"""
@@ -167,11 +195,23 @@ class AbstractSelectable:
             self.db1.execute(query)
             
         else:
-            queries=self._build_queries_from_blocks()
-            for query in queries:
-                self.db1.execute()
+            queries, queries_destinations=self._build_queries_from_blocks()
             self._query_blocks=[]
-
+            for i,query in enumerate(queries):
+                self.db1.execute()
+                
+                if "SELECT" in query:
+                    selected_columns=self._get_selected_columns(query)
+                    rows=self._fetch_results(len(selected_columns))
+                    
+                    
+                    if queries_destinations[i]=="DF":
+                        df = pd.DataFrame(rows, columns=selected_columns)
+                        return(df)
+                    else:
+                        return(rows)
+                    
+            
 
 class AbstractJoinable(AbstractSelectable):
     def __init__(self, db1, name, columns=None):
@@ -367,7 +407,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 table1=AbstractTable(None,"prices")
 table1.query_building_enabled=True
 table1.select("price")
-table1.select("price, name").where("price",5).where("name","John")
+table1.select("price, name").where("price",5).where("name","John").to_df()
 table1.execute()
 
 print(table1._query_blocks)
