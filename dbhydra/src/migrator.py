@@ -4,6 +4,8 @@ import json
 
 
 class Migrator:
+    """It was somewhat tested only for MySQL and Postgre dialect"""
+    
     def __init__(self, db=None):
         self.db = db
         self.migration_number = 1

@@ -13,7 +13,7 @@ from dbhydra.src.mongo_db import MongoDb
 from dbhydra.src.postgres_db import PostgresDb
 from dbhydra.src.xlsx_db import XlsxDb, XlsxDB
 from dbhydra.src.abstract_db import AbstractDb
-from dbhydra.src.tables import Table, PostgresTable, MysqlTable, XlsxTable, AbstractTable, MongoTable, BigQueryTable
+from dbhydra.src.tables import SqlServerTable, PostgresTable, MysqlTable, XlsxTable, AbstractTable, MongoTable, BigQueryTable, Table
 ##### Do not remove imports - they are expored in the package
 
 
