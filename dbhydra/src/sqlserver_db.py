@@ -2,7 +2,7 @@
 import sys
 
 from dbhydra.src.abstract_db import AbstractDb
-from dbhydra.src.tables import Table
+from dbhydra.src.tables import SqlServerTable
 from dbhydra.src.errors.exceptions import DbHydraException
 
 
@@ -13,6 +13,8 @@ if sys.platform != "darwin":
 
 
 class SqlServerDb(AbstractDb):
+    matching_table_class = SqlServerTable
+    
     def connect_remotely(self):
         if sys.platform == "darwin":
             raise DbHydraException("pyodbc library (MSSQL) not supported on macOS.")
@@ -46,7 +48,7 @@ class SqlServerDb(AbstractDb):
         print("DB connection established")
 
     def get_all_tables(self):
-        sysobjects_table = Table(self, "sysobjects", ["name"], ["nvarchar(100)"])
+        sysobjects_table = SqlServerTable(self, "sysobjects", ["name"], ["nvarchar(100)"])
         query = "select name from sysobjects where xtype='U'"
         rows = sysobjects_table.select(query)
         return (rows)
@@ -55,18 +57,18 @@ class SqlServerDb(AbstractDb):
         tables = self.get_all_tables()
         table_dict = dict()
         for i, table in enumerate(tables):
-            table_dict[table] = Table.init_all_columns(self, table)
+            table_dict[table] = SqlServerTable.init_all_columns(self, table)
 
         return (table_dict)
 
     def get_foreign_keys_columns(self):
-        sys_foreign_keys_columns_table = Table(self, "sys.foreign_key_columns",
+        sys_foreign_keys_columns_table = SqlServerTable(self, "sys.foreign_key_columns",
                                                ["parent_object_id", "parent_column_id", "referenced_object_id",
                                                 "referenced_column_id"], ["int", "int", "int", "int"])
         query = "select parent_object_id,parent_column_id,referenced_object_id,referenced_column_id from sys.foreign_key_columns"
         rows = sys_foreign_keys_columns_table.select(query)
 
-        sys_foreign_keys_columns_table = Table(self, "sys.tables", ["object_id", "name"], ["int", "nvarchar(100)"])
+        sys_foreign_keys_columns_table = SqlServerTable(self, "sys.tables", ["object_id", "name"], ["int", "nvarchar(100)"])
         query = "select object_id,name from sys.tables"
         table_names = sys_foreign_keys_columns_table.select(query)
 
