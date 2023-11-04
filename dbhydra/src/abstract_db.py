@@ -30,6 +30,21 @@ def read_connection_details(config_file):
 
 
 
+
+
+class Transaction:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+
+
+
 class AbstractDb(abc.ABC):
     matching_table_class = AbstractTable
     
@@ -67,6 +82,8 @@ class AbstractDb(abc.ABC):
         self.DB_DATABASE = db_details["DB_DATABASE"]
         self.DB_USERNAME = db_details["DB_USERNAME"]
         self.DB_PASSWORD = db_details["DB_PASSWORD"]
+        
+        self.is_autocommiting=True
 
         if "DB_PORT" in db_details.keys():
             self.DB_PORT = int(db_details["DB_PORT"])
@@ -139,9 +156,28 @@ class AbstractDb(abc.ABC):
 
             yield table
 
-    def execute(self, query, is_autocommitting=True):
+
+    @contextmanager
+    def transaction(self):
+        self.is_autocommiting=False
+        transaction = Transaction(self.connection)
+        self.active_transactions.append(transaction)
+        try:
+            yield transaction
+        except Exception as e:
+            transaction.rollback()
+            raise e
+        else:
+            transaction.commit()
+        finally:
+            self.active_transactions.remove(transaction)
+            if len(self.active_transactions)==0:
+                self.is_autocommiting=True
+
+
+    def execute(self, query):
         result=self.cursor.execute(query)
-        if is_autocommitting:
+        if self.is_autocommitting:
             self.cursor.commit()
         return(result)
 
