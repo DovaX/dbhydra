@@ -1,10 +1,14 @@
 
 import sys
-import pyodbc
 
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import Table
 from dbhydra.src.errors.exceptions import DbHydraException
+
+
+#! Disabled on macOS --> problematic import
+if sys.platform != "darwin":
+    import pyodbc
 
 
 
