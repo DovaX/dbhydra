@@ -5,6 +5,8 @@ import pymysql
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import MysqlTable
 
+
+
 class MysqlDb(AbstractDb):
     matching_table_class = MysqlTable
     python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
@@ -37,16 +39,10 @@ class MysqlDb(AbstractDb):
         print("DB connection established")
 
     def create_new_db(self):
-        self.connection = pymysql.connect(host=self.DB_SERVER, user=self.DB_USERNAME,
-                                          password=self.DB_PASSWORD,
-                                          charset="utf8mb4", cursorclass=pymysql.cursors.DictCursor)
+        create_db_command = "CREATE DATABASE " + self.DB_DATABASE
+        self.execute(create_db_command)
 
-        with self.connection.cursor() as cursor:
-            create_db_command = "CREATE DATABASE " + self.DB_DATABASE
-            cursor.execute(create_db_command)
-
-        self.connection.commit()
-
+        
     def execute(self, query, is_autocommitting=True):
         result=self.cursor.execute(query)
         if is_autocommitting:

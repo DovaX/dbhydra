@@ -30,9 +30,6 @@ def read_connection_details(config_file):
 
 
 
-
-
-
 class AbstractDb(abc.ABC):
     matching_table_class = AbstractTable
     

@@ -17,9 +17,10 @@ from dbhydra.src.tables import Table, PostgresTable, MysqlTable, XlsxTable, Abst
 ##### Do not remove imports - they are expored in the package
 
 
-
 class Jsonable(str):
+    """Is used as type in python_database_type_mapping"""    
     pass
+
 
 
 # dataframe - dictionary auxiliary functions

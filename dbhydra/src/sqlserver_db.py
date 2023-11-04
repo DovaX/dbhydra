@@ -21,12 +21,11 @@ class SqlServerDb(AbstractDb):
 
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
-                                           r'SERVER=' + self.DB_SERVER + ';'
-                                                                         r'DATABASE=' + self.DB_DATABASE + ';'
-                                                                                                           r'UID=' + self.DB_USERNAME + ';'
-                                                                                                                                        r'PWD=' + self.DB_PASSWORD + '',
+            r'SERVER=' + self.DB_SERVER + ';'
+            r'DATABASE=' + self.DB_DATABASE + ';'
+            r'UID=' + self.DB_USERNAME + ';'
+            r'PWD=' + self.DB_PASSWORD + '',
             timeout=1
-
         )
         self.cursor = self.connection.cursor()
         print("DB connection established")
@@ -37,9 +36,9 @@ class SqlServerDb(AbstractDb):
         
         self.connection = pyodbc.connect(
             r'DRIVER={' + self.DB_DRIVER + '};'
-                                           r'SERVER=' + self.DB_SERVER + ';'
-                                                                         r'DATABASE=' + self.DB_DATABASE + ';'
-                                                                                                           r'TRUSTED_CONNECTION=yes;',
+            r'SERVER=' + self.DB_SERVER + ';'
+            r'DATABASE=' + self.DB_DATABASE + ';'
+            r'TRUSTED_CONNECTION=yes;',
             timeout=1
             # r'PWD=' + self.DB_PASSWORD + '')
         )
