@@ -231,6 +231,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         super().__init__(db1, name, columns)
         self.types: list[str] = types #[] if types is None else types - is wrong, if types not initialized it should be None, not empty list
         self.id_column_name: str = id_column_name
+        assert len(self.columns) == len(self.types)
+        self.column_type_dict={self.columns[i]:self.types[i] for i,x in enumerate(self.columns)}
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
@@ -402,28 +404,4 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
 
 
-
-
-table1=AbstractTable(None,"prices")
-table1.query_building_enabled=True
-table1.select("price")
-table1.select("price, name").where("price",5).where("name","John").to_df()
-table1.execute()
-
-print(table1._query_blocks)
-
-
-# select_query=price_table.select("price").where("id",1)
-# update_query=table1.update().where()
-# delete_query=table1.
-
-
-
-
-
-# table1.select(columns).where("uid",10).where("project_uid",20)
-
-#with db1.transaction() as t:
-#    table1.select()
-    
     
