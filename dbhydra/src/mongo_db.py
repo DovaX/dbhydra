@@ -5,6 +5,7 @@ from dbhydra.src.tables import MongoTable
 
 
 class MongoDb(AbstractDb):
+    matching_table_class = MongoTable
 
     def connect_locally(self):
         self.connection = pymongo.MongoClient(

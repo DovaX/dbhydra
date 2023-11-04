@@ -3,7 +3,6 @@ import math
 import json
 
 
-
 class Migrator:
     def __init__(self, db=None):
         self.db = db
@@ -17,46 +16,29 @@ class Migrator:
         operation = list(migration_dict.keys())[0]
         options = migration_dict[operation]
         if operation == "create":
-            if (isinstance(self.db, Mysqldb)):
-                table = MysqlTable(self.db, options["table_name"], options["columns"], options["types"])
-            elif (isinstance(self.db, PostgresDb)):
-                table = PostgresTable(self.db, options["table_name"], options["columns"], options["types"])
+            table = matching_table_class(self.db, options["table_name"], options["columns"], options["types"])
             table.convert_types_from_mysql()
             table.create()
         elif operation == "drop":
-            if (isinstance(self.db, Mysqldb)):
-                table = MysqlTable(self.db, options["table_name"])
-            elif (isinstance(self.db, PostgresDb)):
-                table = PostgresTable(self.db, options["table_name"])
+            table = matching_table_class(self.db, options["table_name"])
             table.drop()
         elif operation == "add_column":
-            if (isinstance(self.db, Mysqldb)):
-                table = MysqlTable(self.db, options["table_name"])
-            elif (isinstance(self.db, PostgresDb)):
-                table = PostgresTable(self.db, options["table_name"])
+            table = matching_table_class(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
             table.convert_types_from_mysql()
             table.add_column(options["column_name"], options["column_type"])
         elif operation == "modify_column":
-            if (isinstance(self.db, Mysqldb)):
-                table = MysqlTable(self.db, options["table_name"])
-            elif (isinstance(self.db, PostgresDb)):
-                table = PostgresTable(self.db, options["table_name"])
+            table = matching_table_class(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
             table.convert_types_from_mysql()
             table.modify_column(options["column_name"], options["column_type"])
         elif operation == "drop_column":
-            if (isinstance(self.db, Mysqldb)):
-                table = MysqlTable(self.db, options["table_name"])
-            elif (isinstance(self.db, PostgresDb)):
-                table = PostgresTable(self.db, options["table_name"])
+            table = matching_table_class(self.db, options["table_name"])
             table.initialize_columns()
             table.initialize_types()
             table.drop_column(options["column_name"])
-
-
 
     def next_migration(self):
         self.migration_number += 1

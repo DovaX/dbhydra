@@ -1,6 +1,6 @@
 
 from dbhydra.src.abstract_db import AbstractDb
-from dbhydra.src.tables import BigQueryTable
+from dbhydra.src.tables import PostgresTable
 
 from sys import platform
 if platform != "linux" and platform != "linux2":
@@ -9,6 +9,7 @@ if platform != "linux" and platform != "linux2":
 
 
 class PostgresDb(AbstractDb):
+    matching_table_class = PostgresTable
 
     def connect_locally(self):
         self.connection = psycopg2.connect(

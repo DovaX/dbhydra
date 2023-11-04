@@ -8,6 +8,8 @@ from dbhydra.src.tables import BigQueryTable
 
 
 class BigQueryDb(AbstractDb):
+    matching_table_class = BigQueryTable
+    
     def __init__(self, db_details):
         self.credentials_path = db_details["DB_SERVER"]
         self.dataset = db_details["DB_DATABASE"]

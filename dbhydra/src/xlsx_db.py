@@ -1,4 +1,6 @@
 from dbhydra.src.abstract_db import AbstractDb
+from dbhydra.src.tables import XlsxTable
+
 import threading
 import pathlib
 import os
@@ -8,6 +10,9 @@ class XlsxDb(AbstractDb):
     """Folder-structure with .xlsx files representing database tables
     It does not need any server and runs locally with same syntax as other DB dialects
     """
+    
+    matching_table_class = XlsxTable
+    
     def __init__(self, config_file="config.ini", db_details=None):
         self.locally=True
         if db_details is None:
