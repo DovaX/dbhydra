@@ -4,53 +4,112 @@ import numpy as np
 import abc
 
 
+class Query:
+    def __init__(self, query):
+        pass
+        
+        
+    
+    
+    
+
+
+class Select:
+    def __init__(self, columns:list, table):
+        self.columns=columns
+        self.table=table
+        
+    def __str__(self):
+        return("SELECT "+",".join(self.columns)+" FROM "+self.table.name)
+    
+    
+class Insert:
+    def __init__(self,column_value_dict:dict, table):
+        self.column_value_dict=column_value_dict
+        self.table=table
+        
+        
+class Update:
+    def __init__(self,column_value_dict:dict, table):
+        self.column_value_dict=column_value_dict
+        self.table=table
+        
+        
+class Delete:
+    def __init__(self, table):
+        self.table=table
+        
+class Where:
+    def __init__(self, column: str, value: Any, operator="="):
+        self.column = column
+        self.value = value
+        self.operator = operator
+    
+    def __str__(self):
+        return f"WHERE {self.column} {self.operator} {self.value}"
+      
+  
+
 # Tables
 class AbstractSelectable:
     def __init__(self, db1, name, columns=None):
         self.db1 = db1
         self.name = name
         self.columns = columns
+        self.query_building_enabled=False
+        self._query_blocks=[]
+        
 
     def select(self, query, flatten_results=False):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        print(query)
-        self.db1.cursor.execute(query)
-        rows = self.db1.cursor.fetchall()
         
-        def get_number_of_selected_columns(query):
+        
+        def get_selected_columns(query):
             column_string = query.lower().split("from")[0]
             if "*" in column_string:
-                columns_count = len(self.columns)
+                columns = self.columns
             elif column_string.find(",") == -1:
-                columns_count = 1
+                columns = [column_string.replace("select","").strip()]
             else:
-                columns_count = len(column_string.split(","))
-            return(columns_count)
+                columns = [x.strip() for x in column_string.split(",")]
+            return(columns)
         
-        def cast_rows_to_list_of_lists(rows):
-            cleared_rows = []
-            for row in rows:  # Because of unhashable type: 'pyodbc.Row'
-                list1 = []
-                for i in range(columns_count):
-                    list1.append(row[i])
-                cleared_rows.append(list1)
-            return(cleared_rows)
         
-        def flatten_results(rows, columns_count):
-            """Returns flat list for one column and list of lists for multiple columns"""
+        if self.query_building_enabled:
+            columns=get_selected_columns(query)
+            self._query_blocks.append(Select(columns, self))
+            return(self) #to enable chaining
+        
+        else:
+            print(query)
+            self.db1.cursor.execute(query)
+            rows = self.db1.cursor.fetchall()
+               
             
+            def cast_rows_to_list_of_lists(rows):
+                cleared_rows = []
+                for row in rows:  # Because of unhashable type: 'pyodbc.Row'
+                    list1 = []
+                    for i in range(columns_count):
+                        list1.append(row[i])
+                    cleared_rows.append(list1)
+                return(cleared_rows)
+            
+            def flatten_results(rows, columns_count):
+                """Returns flat list for one column and list of lists for multiple columns"""
                 
-            if columns_count == 1:
-                cleared_rows = [item[0] for item in rows]
+                    
+                if columns_count == 1:
+                    cleared_rows = [item[0] for item in rows]
+                
+                return(cleared_rows)
             
-            return(cleared_rows)
-        
-        rows=cast_rows_to_list_of_lists(rows)
-        columns_count=get_number_of_selected_columns(query)
-        if flatten_results:
-            results=flatten_results(rows, columns_count)
-        return (results)
+            rows=cast_rows_to_list_of_lists(rows)
+            if flatten_results:
+                columns_count=len(get_selected_columns(query))
+                results=flatten_results(rows, columns_count)
+            return (results)
 
     def select_all(self):
         all_cols_query = ""
@@ -64,14 +123,54 @@ class AbstractSelectable:
     def select_to_df(self):
         rows = self.select_all()
         table_columns = self.columns
-        demands_df = pd.DataFrame(rows, columns=table_columns)
-        return (demands_df)
+        df = pd.DataFrame(rows, columns=table_columns)
+        return (df)
 
-    def export_to_xlsx(self):
+    def export_to_xlsx(self, filename="items.xlsx"):
         list1 = self.select_all()
         df1 = pd.DataFrame(list1, columns=["id"] + self.columns)
-        df1.to_excel("items.xlsx")
-
+        df1.to_excel(filename)
+        
+    def where(self, column, value, operator="="):
+        self._query_blocks.append(Where(column, value, operator))
+        return(self) #to enable chaining
+        
+    
+    def _construct_query_string_from_blocks(self,blocks):
+        core_query=" ".join([str(x) for x in blocks if type(x)!=Where])
+        where_query=" ".join([str(x) for x in blocks if type(x)==Where])
+        where_query=where_query.replace("WHERE","AND")
+        where_query=where_query.replace("AND","WHERE",1) #First WHERE is not replaced by AND
+        query=" ".join([core_query,where_query])
+        print(query)
+        return(query)
+    
+    def _build_queries_from_blocks(self):
+        queries=[]
+        grouped_blocks=[]
+        for i,block in enumerate(self._query_blocks):
+            if type(block)!=Where:
+                grouped_blocks.append([block])
+            else:
+                grouped_blocks[-1].append(block)
+            
+        for i, grouped_block in enumerate(grouped_blocks):
+            query=self._construct_query_string_from_blocks(grouped_block)
+            queries.append(query)
+            single_query_blocks=[block]
+            
+        return(queries)
+    
+    def execute(self, query=""):
+        """passes execution to DB object"""
+        if not self.query_building_enabled:
+            self.db1.execute(query)
+            
+        else:
+            queries=self._build_queries_from_blocks()
+            for query in queries:
+                self.db1.execute()
+            self._query_blocks=[]
 
 
 class AbstractJoinable(AbstractSelectable):
@@ -106,7 +205,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     def drop(self):
         query = "DROP TABLE " + self.name
         print(query)
-        self.db1.execute(query)
+        self.execute(query)
 
     def update(self, variable_assign, where=None):
         if where is None:
@@ -114,7 +213,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
         print(query)
-        return self.db1.execute(query)
+        return self.execute(query)
 
     def update_from_df(
             self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None) -> None:
@@ -159,7 +258,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             sql_query += ";"
 
         print(sql_query)
-        self.db1.execute(sql_query)
+        self.execute(sql_query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
         """
@@ -258,5 +357,33 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             query = "DELETE FROM " + self.name
         else:
             query = "DELETE FROM " + self.name + " WHERE " + where
-        return self.db1.execute(query)
+        return self.execute(query)
 
+
+
+
+
+
+table1=AbstractTable(None,"prices")
+table1.query_building_enabled=True
+table1.select("price")
+table1.select("price, name").where("price",5).where("name","John")
+table1.execute()
+
+print(table1._query_blocks)
+
+
+# select_query=price_table.select("price").where("id",1)
+# update_query=table1.update().where()
+# delete_query=table1.
+
+
+
+
+
+# table1.select(columns).where("uid",10).where("project_uid",20)
+
+#with db1.transaction() as t:
+#    table1.select()
+    
+    
