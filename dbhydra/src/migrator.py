@@ -4,7 +4,7 @@ import json
 
 
 class Migrator:
-    """It was somewhat tested only for MySQL and Postgre dialect"""
+    """It was somewhat tested only for MySQL and Postgres dialect"""
     
     def __init__(self, db=None):
         self.db = db
