@@ -1,5 +1,5 @@
 from dbhydra.dbhydra_core import *
-
+from dbhydra import src
 
 __all__=["SqlServerDb","MysqlDb","BigQueryDb","MongoDb","PostgresDb","XlsxDb","AbstractDb",
          "SqlServerTable", "PostgresTable", "MysqlTable", "XlsxTable", "AbstractTable", "MongoTable","BigQueryTable", "Table",
