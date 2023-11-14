@@ -4,8 +4,6 @@ from typing import Optional, Any
 import abc
 
 #xlsx imports
-import sys
-import os
 import pathlib
 
 from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
@@ -880,28 +878,30 @@ class MysqlTable(AbstractSelectable, AbstractTable):
 ############### XLSX ##################
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name="id", use_csv=False):
         super().__init__(db1, name, columns)
         self.types = types
-        self.id_column_name=id_column_name
-        self.table_directory_path: pathlib.Path = self.db1.db_directory_path / f"{self.name}.xlsx"
+        self.id_column_name = id_column_name
+        self.use_csv = use_csv
+
+        table_filename = f"{self.name}.csv" if self.use_csv else f"{self.name}.xlsx"
+        self.table_directory_path: pathlib.Path = self.db1.db_directory_path / table_filename
+
+    def _save_table(self, df: pd.DataFrame):
+        if self.use_csv:
+            df.to_csv(self.table_directory_path, index=False)
+        else:
+            df.to_excel(self.table_directory_path, index=False)
 
     def create(self):
         if not self.table_directory_path.exists():
-            df=pd.DataFrame(columns=self.columns)
-            df.to_excel(self.table_directory_path, index=False)
+            df = pd.DataFrame(columns=self.columns)
+            self._save_table(df)
         else:
             print(f"Table '{self.name}' already exists")
 
     def drop(self):
-        if self.table_directory_path.exists():
-            if sys.platform in ["darwin","linux","linux2"]:
-                command="rm "+str(self.table_directory_path)
-            else:
-                command="del "+str(self.table_directory_path)
-            os.system(command)
-        
-
+        self.table_directory_path.unlink(missing_ok=True)
 
     def select_to_df(self):
         # String must be typed with 'object' otherwise they get parsed arbitrarily and
@@ -911,19 +911,27 @@ class XlsxTable(AbstractTable):
         }
 
         try:
-            df = pd.read_excel(self.table_directory_path, dtype=column_type_map)
+            if self.use_csv:
+                df = pd.read_csv(self.table_directory_path, dtype=column_type_map, encoding='utf-8')
+            else:
+                df = pd.read_excel(self.table_directory_path, dtype=column_type_map)
+
             df.replace({np.nan: None}, inplace=True)
         except Exception as e:
-            print("Error: ", e)
+            print(f"Error while reading data into XlsxTable: {e}")
             df = pd.DataFrame(columns=self.columns)
-        return (df)
+
+        return df
 
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False):
         assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         original_df = self.select_to_df()
 
-        original_df.index=original_df[self.id_column_name]
+        # Need to save original dtypes, otherwise some of them will be changed during DF concatenation
+        df_types = df.dtypes
+
+        original_df.index = original_df[self.id_column_name]
         try:
             original_df = original_df.drop(original_df.columns[0], axis=1)
         except:
@@ -935,25 +943,28 @@ class XlsxTable(AbstractTable):
 
         def concat_with_reset_index_in_second_df(original_df, df):
             """Subsitute of reset_index method because we need to maintain the ids of original df"""
-            if len(original_df.index)>0:
+            if len(original_df.index) > 0:
                 maximal_index = max(original_df.index)
             else:
-                maximal_index=0
+                maximal_index = 0
+
             df.index = df.index + maximal_index + 1
-            df.reindex(columns=original_df.columns.tolist()) #to ensure that columns get correctly inserted
-            result_df = pd.concat([original_df,df])
-            return (result_df)
+            df.reindex(columns=original_df.columns.tolist())  # to ensure that columns get correctly inserted
+            result_df = pd.concat([original_df, df]).astype(df_types)       # Cast to original dtypes
+
+            return result_df
 
         df = concat_with_reset_index_in_second_df(original_df, df)
-        df[self.id_column_name]=df.index
-        df = df.reindex(columns=[self.id_column_name]+df.columns[:-1].tolist()) #uid as a first column
-        df.reset_index(drop=True,inplace=True)
-        df.to_excel(self.table_directory_path, index=False)
+        df[self.id_column_name] = df.index
+        df = df.reindex(columns=[self.id_column_name] + df.columns[:-1].tolist())  # uid as a first column
+        df.reset_index(drop=True, inplace=True)
+
+        self._save_table(df)
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
         #df.drop(df.columns[0], axis=1, inplace=True)
-        df.to_excel(self.table_directory_path, index=False)
+        self._save_table(df)
 
     # def update(self, variable_assign: str, where: Optional[str] = None):
     #     def split_assign(variable_assign):
@@ -1007,7 +1018,8 @@ class XlsxTable(AbstractTable):
         columns_to_update = [pair[0] for pair in column_value_pairs]
         values_to_update = [pair[1] for pair in column_value_pairs]
         df.loc[df[where_column] == where_value, columns_to_update] = values_to_update
-        df.to_excel(self.table_directory_path, index=False)
+
+        self._save_table(df)
 
     def update_from_df(self, update_df: pd.DataFrame, where_column: str, where_value: Any) -> None:
         """Update the xlsx file with the provided dataframe.
@@ -1024,7 +1036,8 @@ class XlsxTable(AbstractTable):
 
         table_df = self.select_to_df()
         table_df.loc[table_df[where_column] == where_value, update_df.columns] = update_df.values
-        table_df.to_excel(self.table_directory_path, index=False)
+
+        self._save_table(table_df)
 
     def delete(self, where=None) -> Optional[int]:
         def split_assign(variable_assign):

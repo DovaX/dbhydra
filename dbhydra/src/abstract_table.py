@@ -3,6 +3,8 @@ from typing import Optional, Any
 import numpy as np
 import abc
 
+from dbhydra.src.tables import XlsxTable
+
 
 class Select:
     def __init__(self, columns:list, table):
@@ -237,11 +239,16 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
     @classmethod
-    def init_from_column_type_dict(cls, db1, name, column_type_dict, id_column_name="id"):
+    def init_from_column_type_dict(cls, db1, name, column_type_dict, id_column_name="id", use_csv=False):
         column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
         columns = list(column_converted_type_dict.keys())
         types = list(column_converted_type_dict.values())
-        return cls(db1, name, columns, types, id_column_name=id_column_name)
+
+        # FIXME: not ideal from OOP prospective
+        if cls == XlsxTable:
+            return XlsxTable(db1, name, columns, types, id_column_name=id_column_name, use_csv=use_csv)
+        else:
+            return cls(db1, name, columns, types, id_column_name=id_column_name)
     
     
     def drop(self):

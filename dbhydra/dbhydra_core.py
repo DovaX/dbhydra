@@ -38,17 +38,17 @@ def dict_to_df(dictionary, column1, column2):
 from pydantic_core import CoreSchema, core_schema
 from pydantic import GetCoreSchemaHandler
 
+
 class AbstractModel(abc.ABC, BaseModel):
     @classmethod
-    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id"):
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id", use_csv: bool = False):
         column_type_dict = create_table_structure_dict(cls, id_column_name=id_column_name)
-        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name, use_csv=use_csv)
         return dbhydra_table
     
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: GetCoreSchemaHandler) -> CoreSchema:
         return core_schema.no_info_after_validator_function(cls, handler(str))
-
 
  
 
