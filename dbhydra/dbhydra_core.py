@@ -41,9 +41,9 @@ from pydantic import GetCoreSchemaHandler
 
 class AbstractModel(abc.ABC, BaseModel):
     @classmethod
-    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id", use_csv: bool = False):
+    def generate_dbhydra_table(cls, table_class: AbstractTable, db1, name, id_column_name="id"):
         column_type_dict = create_table_structure_dict(cls, id_column_name=id_column_name)
-        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name, use_csv=use_csv)
+        dbhydra_table = table_class.init_from_column_type_dict(db1, name, column_type_dict, id_column_name=id_column_name)
         return dbhydra_table
     
     @classmethod

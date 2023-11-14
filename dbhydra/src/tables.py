@@ -878,17 +878,16 @@ class MysqlTable(AbstractSelectable, AbstractTable):
 ############### XLSX ##################
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name="id", use_csv=False):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name="id"):
         super().__init__(db1, name, columns)
         self.types = types
         self.id_column_name = id_column_name
-        self.use_csv = use_csv
 
-        table_filename = f"{self.name}.csv" if self.use_csv else f"{self.name}.xlsx"
+        table_filename = f"{self.name}.csv" if self.db1.is_csv else f"{self.name}.xlsx"
         self.table_directory_path: pathlib.Path = self.db1.db_directory_path / table_filename
 
     def _save_table(self, df: pd.DataFrame):
-        if self.use_csv:
+        if self.db1.is_csv:
             df.to_csv(self.table_directory_path, index=False)
         else:
             df.to_excel(self.table_directory_path, index=False)
@@ -911,7 +910,7 @@ class XlsxTable(AbstractTable):
         }
 
         try:
-            if self.use_csv:
+            if self.db1.is_csv:
                 df = pd.read_csv(self.table_directory_path, dtype=column_type_map, encoding='utf-8')
             else:
                 df = pd.read_excel(self.table_directory_path, dtype=column_type_map)

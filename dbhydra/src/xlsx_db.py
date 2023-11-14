@@ -13,8 +13,9 @@ class XlsxDb(AbstractDb):
     
     matching_table_class = XlsxTable
     
-    def __init__(self, config_file="config.ini", db_details=None):
+    def __init__(self, config_file="config.ini", db_details=None, is_csv=False):
         self.locally=True
+        self.is_csv = is_csv
         if db_details is None:
             self.name="new_db"
             self.db_directory_path = None
