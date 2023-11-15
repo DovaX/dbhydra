@@ -601,7 +601,7 @@ class Table(SqlServerTable):
 
 
 
-class MysqlTable(AbstractSelectable, AbstractTable):
+class MysqlTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns)
         self.types = types
@@ -878,8 +878,8 @@ class MysqlTable(AbstractSelectable, AbstractTable):
 ############### XLSX ##################
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name="id"):
-        super().__init__(db1, name, columns)
+    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
+        super().__init__(db1, name, columns, types)
         self.types = types
         self.id_column_name = id_column_name
 

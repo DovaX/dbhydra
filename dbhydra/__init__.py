@@ -1,4 +1,3 @@
-from dbhydra.dbhydra_core import *
+from dbhydra import *
 
-
-__all__=["*"]
+__all__=["dbhydra_core", "src", "tests"]
