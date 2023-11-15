@@ -241,6 +241,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         column_converted_type_dict = db1._convert_column_type_dict_from_python(column_type_dict)
         columns = list(column_converted_type_dict.keys())
         types = list(column_converted_type_dict.values())
+
         return cls(db1, name, columns, types, id_column_name=id_column_name)
     
     
