@@ -603,8 +603,7 @@ class Table(SqlServerTable):
 
 class MysqlTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
-        super().__init__(db1, name, columns)
-        self.types = types
+        super().__init__(db1, name, columns, types)
         self.id_column_name = id_column_name
 
     #Disabled because it is inherited
@@ -880,7 +879,6 @@ class MysqlTable(AbstractTable):
 class XlsxTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns, types)
-        self.types = types
         self.id_column_name = id_column_name
 
         table_filename = f"{self.name}.csv" if self.db1.is_csv else f"{self.name}.xlsx"
