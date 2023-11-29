@@ -66,10 +66,17 @@ class AbstractSelectable:
         
         
     def _get_selected_columns(self, query):
-        column_string = query.lower().split("from")[0]
+        from_keyword_count=query.lower().count("from") #There can be "from" substrings in column names: e.g. SELECT uid,from_node_uid,to_node_uid,channel,visible,pipeline_uid,project_uid FROM edges
+        #print("COUNT", from_keyword_count)
+        if from_keyword_count==1:
+            column_string = query.lower().split("from")[0]
+        else:
+            column_string = "from".join(query.lower().split("from")[0:(from_keyword_count)])
+        #print("column string",column_string)
         if "*" in column_string:
             columns = self.columns
         elif column_string.find(",") == -1:
+            assert column_string.count("select")<=1 #assume there are no table columns containing "select" substring
             columns = [column_string.replace("select","").strip()]
         else:
             columns = [x.strip() for x in column_string.split(",")]
