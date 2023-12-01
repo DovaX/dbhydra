@@ -904,14 +904,23 @@ class XlsxTable(AbstractTable):
         # String must be typed with 'object' otherwise they get parsed arbitrarily and
         # then cast to string, e.g. 'true' -> True -> 'True'
         column_type_map = {
-            column: object for column, type_ in zip(self.columns, self.types) if type_ == "str"
+            column: object for column, type_ in self.column_type_dict.items() if type_ == "str"
         }
+        date_columns = [
+            column for column, type_ in self.column_type_dict.items() if type_ == "datetime"
+        ]
 
         try:
             if self.db1.is_csv:
-                df = pd.read_csv(self.table_directory_path, dtype=column_type_map, encoding='utf-8')
+                df = pd.read_csv(
+                    self.table_directory_path, dtype=column_type_map,
+                    parse_dates=date_columns, encoding='utf-8'
+                )
             else:
-                df = pd.read_excel(self.table_directory_path, dtype=column_type_map)
+                df = pd.read_excel(
+                    self.table_directory_path, dtype=column_type_map, 
+                    parse_dates=date_columns
+                )
 
             df.replace({np.nan: None}, inplace=True)
         except Exception as e:
