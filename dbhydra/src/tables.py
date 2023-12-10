@@ -905,9 +905,10 @@ class XlsxTable(AbstractTable):
         return(clean_types) 
   
     
+    
     @classmethod
-    def init_all_columns(cls, db1, name):
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
@@ -918,7 +919,7 @@ class XlsxTable(AbstractTable):
             types.pop(id_col_index)
             types.insert(0, "int")
 
-        return (cls(db1, name, columns, types))    
+        return (cls(db1, name, columns, types, id_column_name=id_column_name))    
 
 
 

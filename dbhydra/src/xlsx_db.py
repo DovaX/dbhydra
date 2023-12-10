@@ -93,11 +93,11 @@ class XlsxDb(AbstractDb):
         tables = [x.lower().replace(suffix,"") for x in files]
         return (tables)
 
-    def generate_table_dict(self):
+    def generate_table_dict(self, id_column_name="id"):
         tables = self.get_all_tables()
         table_dict = dict()
         for i, table in enumerate(tables):
-            table_dict[table] = XlsxTable.init_all_columns(self, table)
+            table_dict[table] = XlsxTable.init_all_columns(self, table, id_column_name)
         return (table_dict)
 
 
