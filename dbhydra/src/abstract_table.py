@@ -238,8 +238,12 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         super().__init__(db1, name, columns)
         self.types: list[str] = types #[] if types is None else types - is wrong, if types not initialized it should be None, not empty list
         self.id_column_name: str = id_column_name
-        assert len(self.columns) == len(self.types)
-        self.column_type_dict={self.columns[i]:self.types[i] for i,x in enumerate(self.columns)}
+        if self.columns is not None and self.types is not None:
+            assert len(self.columns) == len(self.types) 
+            self.column_type_dict={self.columns[i]:self.types[i] for i,x in enumerate(self.columns)}
+        else:
+            self.column_type_dict={}
+        
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod

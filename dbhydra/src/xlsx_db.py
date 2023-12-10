@@ -83,8 +83,22 @@ class XlsxDb(AbstractDb):
             print("Database directory created")
         except FileExistsError:
             print("Database directory already exists")
+            
+            
+    
 
+    def get_all_tables(self):
+        root,dirs,files=next(os.walk(self.db_directory_path))
+        suffix=".csv" if self.is_csv else ".xlsx"
+        tables = [x.lower().replace(suffix,"") for x in files]
+        return (tables)
 
+    def generate_table_dict(self):
+        tables = self.get_all_tables()
+        table_dict = dict()
+        for i, table in enumerate(tables):
+            table_dict[table] = XlsxTable.init_all_columns(self, table)
+        return (table_dict)
 
 
 class XlsxDB(XlsxDb):

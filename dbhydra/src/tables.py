@@ -890,6 +890,38 @@ class XlsxTable(AbstractTable):
         else:
             df.to_excel(self.table_directory_path, index=False)
 
+    def get_all_columns(self):
+        df=self.select_to_df()
+        columns=df.columns.tolist()
+        return(columns)
+
+
+    def get_all_types(self):
+        df=self.select_to_df()
+        dtypes=df.dtypes.tolist() 
+        types = [str(x) for x in dtypes]
+        clean_types=[x.replace("object","str") for x in types] #Todo support more types
+        
+        return(clean_types) 
+  
+    
+    @classmethod
+    def init_all_columns(cls, db1, name):
+        temporary_table = cls(db1, name)
+        columns = temporary_table.get_all_columns()
+        types = temporary_table.get_all_types()
+
+        if temporary_table.id_column_name in columns:
+            id_col_index = columns.index(temporary_table.id_column_name)
+            columns.pop(id_col_index)
+            columns.insert(0, temporary_table.id_column_name)
+            types.pop(id_col_index)
+            types.insert(0, "int")
+
+        return (cls(db1, name, columns, types))    
+
+
+
     def create(self):
         if not self.table_directory_path.exists():
             df = pd.DataFrame(columns=self.columns)
