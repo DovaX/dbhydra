@@ -591,9 +591,14 @@ class SqlServerTable(AbstractTable):
 
 class Table(SqlServerTable):
     """Deprecated - do not remove until dbhydra 3.x"""
-    def __init__(self, config_file="config.ini", db_details=None):
-        print("Deprecation warning!, Table was renamed to SqlServerTable and the old name will deprecated in future!")
-        super().__init__(config_file=config_file, db_details=db_details)
+    def __init__(self, db1, name, columns=None, types=None):
+        super().__init__(db1, name, columns)
+        self.types = types
+        
+    # TODO: New implementation - DISABLED until fixed (expects incorrect arguments thus causing crashes)
+    # def __init__(self, config_file="config.ini", db_details=None):
+    #     print("Deprecation warning!, Table was renamed to SqlServerTable and the old name will deprecated in future!")
+    #     super().__init__(config_file=config_file, db_details=db_details)
 
 
 
