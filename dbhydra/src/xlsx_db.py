@@ -1,6 +1,7 @@
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import XlsxTable
 
+import contextlib
 import threading
 import pathlib
 import os
@@ -83,9 +84,10 @@ class XlsxDb(AbstractDb):
             print("Database directory created")
         except FileExistsError:
             print("Database directory already exists")
-            
-            
-    
+
+    @contextlib.contextmanager
+    def transaction(self):
+        yield None
 
     def get_all_tables(self):
         root,dirs,files=next(os.walk(self.db_directory_path))
