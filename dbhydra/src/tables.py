@@ -126,8 +126,8 @@ class PostgresTable(AbstractTable):
         return [i for i in super().select_all()]
 
     @classmethod
-    def init_all_columns(cls, db1, name):
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
@@ -280,8 +280,8 @@ class BigQueryTable(AbstractSelectable):
         self.types = types
 
     @classmethod
-    def init_all_columns(cls, db1, name):
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         columns,types = temporary_table.get_all_columns_and_types()
 
         return (cls(db1, name, columns, types))
@@ -384,9 +384,8 @@ class MongoTable():
         return pd.DataFrame(list(self.collection.find(query)))
 
     @classmethod
-    def init_all_columns(cls, db1, name):
-
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         values = temporary_table.get_columns_types()
         columns = values[0][1:]
         types = values[1][1:]
@@ -478,8 +477,8 @@ class SqlServerTable(AbstractTable):
         self.types = types
 
     @classmethod
-    def init_all_columns(cls, db1, name):
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
         return (cls(db1, name, columns, types))
@@ -683,8 +682,8 @@ class MysqlTable(AbstractTable):
 
 
     @classmethod
-    def init_all_columns(cls, db1, name):
-        temporary_table = cls(db1, name)
+    def init_all_columns(cls, db1, name, id_column_name="id"):
+        temporary_table = cls(db1, name, id_column_name)
         columns = temporary_table.get_all_columns()
         types = temporary_table.get_all_types()
 
