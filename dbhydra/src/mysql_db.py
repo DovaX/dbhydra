@@ -61,7 +61,7 @@ class MysqlDb(AbstractDb):
         tables = self.get_all_tables()
         table_dict = dict()
         for i, table in enumerate(tables):
-            table_dict[table] = MysqlTable.init_all_columns(self, table, id_column_name)
+            table_dict[table] = MysqlTable.init_all_columns(self, table)
         return (table_dict)
 
 
