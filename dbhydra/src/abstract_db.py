@@ -98,6 +98,8 @@ class AbstractDb(abc.ABC):
         self.lock = threading.Lock()
 
         self.connect_to_db()
+        
+        self.active_transactions=[]
 
     @abc.abstractmethod
     def connect_locally(self):

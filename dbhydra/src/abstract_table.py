@@ -354,7 +354,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
 
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
-
+        if debug_mode:
+            print("[dbhydra] insert_from_df: table_columns:",self.columns,"df_columns:",df.columns)
         if adjust_df:
             df = self._adjust_df(df, debug_mode)
 
