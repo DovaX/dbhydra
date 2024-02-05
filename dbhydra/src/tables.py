@@ -366,11 +366,11 @@ class MongoTable():
     def update(self, newvalues, query):
         return self.collection.update_many(query, newvalues)
 
-    def insert_from_df(self, dataframe, insert_id=None):
-        if dataframe.empty:
+    def insert_from_df(self, df, insert_id=None):
+        if df.empty:
             return
-        dataframe = dataframe.replace({pd.NA: None})
-        dict_from_df = dataframe.to_dict('records')
+        df = df.replace({pd.NA: None})
+        dict_from_df = df.to_dict('records')
         # dict_from_df = dataframe.apply(lambda x : x.dropna().to_dict(),axis=1).tolist() #get rid of nans
         return self.collection.insert_many(dict_from_df)
 
@@ -967,8 +967,18 @@ class XlsxTable(AbstractTable):
 
         return df
 
-    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False):
-        assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
+    def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
+        
+        if adjust_df:
+            df = self._adjust_df(df, debug_mode)
+        
+        if insert_id:
+            assert len(df.columns) == len(self.columns)
+            assert set(df.columns) == set(self.columns)
+            
+            inserted_columns=self.columns
+        else:
+            assert len(df.columns) + 1 == len(self.columns)  # +1 because of id column
 
         original_df = self.select_to_df()
 
