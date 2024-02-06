@@ -641,8 +641,8 @@ class MysqlTable(AbstractTable):
         
         # SQL might return the column names as a list of lists containing column names one by one instead of a list of names.
         # --> in these cases the list is flattened
-        for i, column in enumerate(self.columns):
-            self.columns[i] = column[0] if type(column) == list else column
+        for i, column in enumerate(columns):
+            columns[i] = column[0] if type(column) == list else column
 
         return (columns)
 
