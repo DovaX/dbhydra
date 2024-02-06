@@ -241,10 +241,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if self.columns is not None and self.types is not None:
             assert len(self.columns) == len(self.types)
             
-            # Hotfix: flatten nested lists (otherwise crashes might happen)
-            # TODO: Search for the causes and implement better handling
-            for i, column in enumerate(self.columns):
-                self.columns[i] = column[0] if type(column) == list else column
             self.column_type_dict={self.columns[i]:self.types[i] for i,x in enumerate(self.columns)}
         else:
             self.column_type_dict={}

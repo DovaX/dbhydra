@@ -635,6 +635,14 @@ class MysqlTable(AbstractTable):
         information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
+        
+        if isinstance(columns, AbstractSelectable):
+            return columns
+        
+        # SQL might return the column names as a list of lists containing column names one by one instead of a list of names.
+        # --> in these cases the list is flattened
+        for i, column in enumerate(self.columns):
+            self.columns[i] = column[0] if type(column) == list else column
 
         return (columns)
 
