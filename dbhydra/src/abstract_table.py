@@ -288,23 +288,32 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if not len(update_df) == 1:
             raise ValueError("There can only be one row in the UPDATE dataframe")
 
-        types_without_id_column = [type_ for column, type_ in zip(self.columns, self.types) 
-                           if column != self.id_column_name]
+        types_without_id_column = [
+            (column, type_) for column, type_ in zip(self.columns, self.types)
+            if column != self.id_column_name
+        ]
+
         if len(types_without_id_column) != len(update_df.columns):
             raise AttributeError(
                 "Number of columns in dataframe does not match number of columns in table"
             )
 
+        # Ensure the same order of columns in DF as in DB table
+        update_df_row_list = [
+            (column_name, update_df.iloc[0][column_name], column_type)
+            for column_name, column_type in types_without_id_column
+        ]
+
         column_value_string = ""
-        for (column, cell_value), column_type in zip(update_df.iloc[0].items(), types_without_id_column):
+        for column_name, cell_value, column_type in update_df_row_list:
             if cell_value is None:
-                column_value_string += f"{column} = NULL, "
+                column_value_string += f"{column_name} = NULL, "
             elif column_type in ["double", "int", "tinyint"]:
-                column_value_string += f"{column} = {cell_value}, "
+                column_value_string += f"{column_name} = {cell_value}, "
             elif "varchar" in column_type:
-                column_value_string += f"{column} = '{cell_value}', "
+                column_value_string += f"{column_name} = '{cell_value}', "
             elif column_type in ["json", "text", "mediumtext", "longtext", "datetime"]:
-                column_value_string += f"{column} = '{cell_value}', "
+                column_value_string += f"{column_name} = '{cell_value}', "
             else:
                 raise AttributeError(f"Unknown column type '{column_type}'")
 

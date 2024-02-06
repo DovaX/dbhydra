@@ -97,7 +97,9 @@ class AbstractDb(abc.ABC):
 
         self.lock = threading.Lock()
 
-        self.connect_to_db()
+        # This call to `self.connect_to_db` is not doing anything as it returns a
+        # context manager object
+        # self.connect_to_db()
         
         self.active_transactions=[]
 
