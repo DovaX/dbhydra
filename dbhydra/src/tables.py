@@ -619,7 +619,7 @@ class MysqlTable(AbstractTable):
     #     return cls(db1, name, columns, types, id_column_name=id_column_name)
 
     def initialize_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
