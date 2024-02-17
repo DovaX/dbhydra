@@ -82,9 +82,10 @@ class PostgresTable(AbstractTable):
         print("==========================================")
 
     def initialize_columns(self):
-        information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
-        columns = information_schema_table.select(query)
+        """
+        TODO Dominik: Check for usecases of this method. Isn't it somewhat duplicated by `get_all_columns`?
+        """
+        columns = self.get_all_columns()
         self.columns = columns
 
     def initialize_types(self):
@@ -92,10 +93,10 @@ class PostgresTable(AbstractTable):
 
     def get_all_columns(self):
         information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '{self.name}';"
         columns = information_schema_table.select(query, flattening_of_results=True)
 
-        return (columns)
+        return columns
 
     def convert_types_from_mysql(self):
         inverse_dict_mysql_to_postgres = dict(zip(POSTGRES_TO_MYSQL_DATA_MAPPING.values(), POSTGRES_TO_MYSQL_DATA_MAPPING.keys()))
@@ -618,9 +619,10 @@ class MysqlTable(AbstractTable):
     #     return cls(db1, name, columns, types, id_column_name=id_column_name)
 
     def initialize_columns(self):
-        information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND  TABLE_NAME  = '" + self.name + "';"
-        columns = information_schema_table.select(query)
+        """
+        TODO Dominik: Check for usecases of this method. Isn't it somewhat duplicated by `get_all_columns`?
+        """
+        columns = self.get_all_columns()
         self.columns = columns
 
     def convert_types_from_mysql(self):
@@ -631,13 +633,12 @@ class MysqlTable(AbstractTable):
 
     def get_all_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '{self.name}';"
         columns = information_schema_table.select(query, flattening_of_results=True)
 
-        return (columns)
+        return columns
 
     def get_all_types(self):
-
         data_types, data_lengths = self.get_data_types_and_character_lengths()
         for i in range(len(data_types)):
             if data_lengths[i] is not None:
