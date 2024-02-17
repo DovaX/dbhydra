@@ -83,7 +83,7 @@ class PostgresTable(AbstractTable):
         print("==========================================")
 
     def initialize_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "';"
         columns = information_schema_table.select(query)
         self.columns = columns
@@ -92,7 +92,7 @@ class PostgresTable(AbstractTable):
         self.types = self.get_all_types()
 
     def get_all_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
 
@@ -104,8 +104,7 @@ class PostgresTable(AbstractTable):
         self.types = postgres_types
 
     def get_all_types(self):
-
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = "SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         data_types = [x[0].lower() for x in types]
@@ -484,13 +483,13 @@ class SqlServerTable(AbstractTable):
         return (cls(db1, name, columns, types))
 
     def get_all_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = SqlServerTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
         return (columns)
 
     def get_all_types(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        information_schema_table = SqlServerTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         return (types)
@@ -632,7 +631,7 @@ class MysqlTable(AbstractTable):
         self.types = self.get_all_types()
 
     def get_all_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         columns = information_schema_table.select(query)
         
@@ -662,7 +661,7 @@ class MysqlTable(AbstractTable):
         'varchar' in the data_types list and 2047 in the data_lengths list.
     """
     def get_data_types_and_character_lengths(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
+        information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
         query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
         types = information_schema_table.select(query)
         data_types = [x[0] for x in types]
@@ -684,7 +683,7 @@ class MysqlTable(AbstractTable):
         return python_types
 
     def get_nullable_columns(self):
-        information_schema_table = Table(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
+        information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = '{self.name}' and IS_NULLABLE = 'YES'"
         nullable_columns = information_schema_table.select(query)
         return (nullable_columns)
