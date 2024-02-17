@@ -1,12 +1,11 @@
 import pandas as pd
 import numpy as np
 from typing import Optional, Any
-import abc
 
 #xlsx imports
 import pathlib
 
-from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
+from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable
 
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
