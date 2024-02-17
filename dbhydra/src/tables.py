@@ -94,7 +94,7 @@ class PostgresTable(AbstractTable):
     def get_all_columns(self):
         information_schema_table = PostgresTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
-        columns = information_schema_table.select(query)
+        columns = information_schema_table.select(query, flattening_of_results=True)
 
         return (columns)
 
@@ -485,7 +485,7 @@ class SqlServerTable(AbstractTable):
     def get_all_columns(self):
         information_schema_table = SqlServerTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME  = '" + self.name + "'"
-        columns = information_schema_table.select(query)
+        columns = information_schema_table.select(query, flattening_of_results=True)
         return (columns)
 
     def get_all_types(self):
