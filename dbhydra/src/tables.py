@@ -882,9 +882,10 @@ class MysqlTable(AbstractTable):
 ############### XLSX ##################
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id", number_of_retries=5):
         super().__init__(db1, name, columns, types)
         self.id_column_name = id_column_name
+        self.NUMBER_OF_RETRIES = number_of_retries
 
         table_filename = f"{self.name}.csv" if self.db1.is_csv else f"{self.name}.xlsx"
         self.table_directory_path: pathlib.Path = self.db1.db_directory_path / table_filename
@@ -950,30 +951,31 @@ class XlsxTable(AbstractTable):
 
         # BUG: If XlsxTable is being accessed by multiple threads, read operation
         # might fail due to race conditions. Add retry mechanism to handle these cases.
-        max_attempts = 5
-        for attempt in range(max_attempts):
+        for attempt in range(self.NUMBER_OF_RETRIES):
             try:
-                if self.db1.is_csv:
-                    df = pd.read_csv(
-                        self.table_directory_path, dtype=column_type_map,
-                        parse_dates=date_columns, encoding='utf-8'
-                    )
-                else:
-                    df = pd.read_excel(
-                        self.table_directory_path, dtype=column_type_map, 
-                        parse_dates=date_columns
-                    )
-
-                df.replace({np.nan: None}, inplace=True)
-            except Exception as e:
+                df = self._select(column_type_map, date_columns)
+            except Exception:
                 # print(f"Error while reading data into XlsxTable: {e}")
                 # df = pd.DataFrame(columns=self.columns)
-                if attempt < max_attempts:
+                if attempt < self.NUMBER_OF_RETRIES:
                     time.sleep(0.1)
                     continue
                 else:
                     print(f"Failed to read data from {self.table_directory_path}, returning empty DataFrame")
                     df = pd.DataFrame(columns=self.columns)
+        return df
+
+    def _select(self, column_type_map, date_columns):
+        if self.db1.is_csv:
+            df = pd.read_csv(
+                self.table_directory_path, dtype=column_type_map, parse_dates=date_columns,
+                encoding='utf-8'
+            )
+        else:
+            df = pd.read_excel(
+                self.table_directory_path, dtype=column_type_map, parse_dates=date_columns
+            )
+        df.replace({np.nan: None}, inplace=True)
         return df
 
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
