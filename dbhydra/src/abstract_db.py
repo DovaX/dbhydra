@@ -1,9 +1,11 @@
 import abc
 import threading
 from contextlib import contextmanager
+from typing import Optional
 
 from dbhydra.src.migrator import Migrator
 from dbhydra.src.tables import AbstractTable
+
 
 def read_connection_details(config_file):
     def read_file(file):
@@ -102,6 +104,7 @@ class AbstractDb(abc.ABC):
         # self.connect_to_db()
         
         self.active_transactions=[]
+        self.last_table_inserted_into: Optional[str] = None
 
     @abc.abstractmethod
     def connect_locally(self):
