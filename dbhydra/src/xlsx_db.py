@@ -1,10 +1,11 @@
+import contextlib
+import os
+import pathlib
+import threading
+from typing import Optional
+
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import XlsxTable
-
-import contextlib
-import threading
-import pathlib
-import os
 
 
 class XlsxDb(AbstractDb):
@@ -29,7 +30,8 @@ class XlsxDb(AbstractDb):
         if self.db_directory_path is None:
             self.db_directory_path = pathlib.Path(self.name) 
             
-            
+        self.last_table_inserted_into: Optional[str] = None
+
         self.python_database_type_mapping = {
         'int': "int",
         'float': "double",
