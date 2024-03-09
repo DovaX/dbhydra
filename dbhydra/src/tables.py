@@ -675,6 +675,18 @@ class MysqlTable(AbstractTable):
 
         return python_types
 
+    def extract_last_id(self) -> Any:
+        """
+        Extract the last inserted ID from the DB.
+
+        LAST_INSERT_ID exists in the DB connection context, therefore is safe to use if DB session is request-scoped
+        In this case we only use global connection, but we use Lock to ensure thread-safety across different requests
+        This is a go-to mechanism for extracting the ID of the inserted record for multiple SQL DBs,
+        altho this specific query is applicable only to MySQL.
+        """
+        assert self.name == self.db1.last_table_inserted_into, "Last table inserted into is not the same as the table being queried"
+        return self.select("SELECT LAST_INSERT_ID()")[0][0]
+
     def get_nullable_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
         query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = '{self.name}' and IS_NULLABLE = 'YES'"
@@ -1014,6 +1026,7 @@ class XlsxTable(AbstractTable):
         df.reset_index(drop=True, inplace=True)
 
         self._save_table(df)
+        self.last_table_inserted_into = self.name
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
@@ -1113,4 +1126,9 @@ class XlsxTable(AbstractTable):
             df.drop(df[df[where_variable] == where_value].index, inplace=True)
             deleted_count = number_of_records - len(df)
         self.replace_from_df(df)
-        return deleted_count
+        return deleted_count    
+
+    def extract_last_id(self) -> Any:
+        assert self.name == self.db1.last_table_inserted_into, "Last table inserted into is not the same as the table being queried"
+        df = self.select_to_df()
+        return df.iloc[-1][self.id_column_name]

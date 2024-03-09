@@ -357,6 +357,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
         return df_copy
 
+    def extract_last_id(self) -> Any:
+        raise NotImplementedError("Method not implemented for this subclass")
 
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):
         if debug_mode:
@@ -403,7 +405,9 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         #             rows[i][j] = "'" + record + "'"
         #print(rows)
         rows = df.values.tolist()
-        return self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
+        result = self.insert(rows, batch=batch, try_mode=try_mode, debug_mode=False, insert_id=insert_id)
+        self.db1.last_table_inserted_into = self.name
+        return result
 
     #TODO: need to solve inserting in different column_order
     #check df column names, permute if needed
