@@ -1026,7 +1026,7 @@ class XlsxTable(AbstractTable):
         df.reset_index(drop=True, inplace=True)
 
         self._save_table(df)
-        self.last_table_inserted_into = self.name
+        self.db1.last_table_inserted_into = self.name
 
     def replace_from_df(self, df):
         assert len(df.columns) == len(self.columns)  # +1 because of id column
