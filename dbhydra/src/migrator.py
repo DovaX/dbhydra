@@ -292,10 +292,20 @@ class Migrator:
                 elif action_name=="values_changed":
                     column_type = deepdiff_action[deepdiff_key]["old_value"]
                     column_new_type = deepdiff_action[deepdiff_key]["new_value"]
-                    forward_migration.append({forward_action: {"table_name": table_name, "column_name": column_name,
-                                                        "column_type": column_new_type}})
-                    backward_migration.append({backward_action: {"table_name": table_name, "column_name": column_name,
-                                                        "column_type": column_type}})
+                    
+                    # HACK: Do not create migrations for cases such as varchar(2047) --> nvarchar(2047)
+                    is_varchar_in_types = "varchar" in column_type and "varchar" in column_new_type
+                    is_max_length_equal = (
+                        column_type[column_type.index("("): column_type.index(")")] 
+                        and column_new_type[column_new_type.index("("): column_new_type.index(")")]
+                        ) if is_varchar_in_types else False
+                    is_varchar_nvarchar_conversion = is_varchar_in_types and is_max_length_equal
+                    
+                    if not is_varchar_nvarchar_conversion:
+                        forward_migration.append({forward_action: {"table_name": table_name, "column_name": column_name,
+                                                            "column_type": column_new_type}})
+                        backward_migration.append({backward_action: {"table_name": table_name, "column_name": column_name,
+                                                            "column_type": column_type}})
             
         return Migration(forward=forward_migration, backward=backward_migration)
     
