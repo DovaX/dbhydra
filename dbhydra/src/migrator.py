@@ -1,6 +1,14 @@
-import pandas as pd
+import os
 import math
 import json
+import pandas as pd
+
+from typing import Optional
+from deepdiff import DeepDiff
+from dataclasses import dataclass, asdict
+
+CURRENT_MIGRATION_DEFAULT_PATH = "./db/migrations/current_migration.json"
+MIGRATION_HISTORY_DEFAULT_PATH = "./db/migrations/migration_history.json"
 
 @dataclass
 class Migration:
