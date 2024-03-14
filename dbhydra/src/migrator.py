@@ -119,6 +119,21 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    def load_migration_from_json(self, json_file_path: str = CURRENT_MIGRATION_DEFAULT_PATH):
+        with open(json_file_path, "r") as file:
+            migration_dict = json.load(file)
+            
+        self.set_current_migration(migration_dict)
+    
+    def save_current_migration_to_json(self, file_path: str = CURRENT_MIGRATION_DEFAULT_PATH):
+        if not file_path.endswith(".json"):
+            raise ValueError("Current migration file must be of '.json' type.")
+        
+        self._build_folder_structure_for_file_path(file_path)
+        
+        with open(file_path, "w+") as file:
+            json.dump(asdict(self.current_migration), file, indent=2)
+    
     def create_table_migration(self, table_name: str, old_structure: Optional[dict], new_structure: Optional[dict]):
         """
         Creates a migration for a database table based on its old and new structures.
