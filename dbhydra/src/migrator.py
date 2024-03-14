@@ -16,7 +16,20 @@ class Migration:
     backward: list[dict]
 
 class Migrator:
-    """It was somewhat tested only for MySQL and Postgres dialect"""
+    """
+    A class for managing database migrations.
+
+    This class provides functionality to create, manage, and execute database migrations
+    using a migration system compatible with MySQL and Postgres dialects. It allows for
+    creating forward and backward migrations, reading and writing migrations to JSON files,
+    and executing migrations based on changes detected in database structures.
+
+    Note: This class is compatible with MySQL and Postgres dialects and has been somewhat tested
+    with those databases. It may require adjustments for other database systems.
+
+    Attributes:
+        db: The database connection object used for executing migrations.
+    """
     
     def __init__(self, db):
         self.db = db
