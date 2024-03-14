@@ -155,6 +155,23 @@ class Migrator:
         self._save_migration_to_history(migration=history_migration)
         self._clear_current_migration()
         
+    def migrate_n_steps_back_in_history(self, n: int, migration_history_json: str = MIGRATION_HISTORY_DEFAULT_PATH):        
+        migration_history = self._read_migration_history_json(migration_history_json)
+        
+        if len(migration_history) < n:
+            raise ValueError(f"Provided n (= {n}) is larger than migration history length (= {len(migration_history)}).")
+
+        total_backward_migration = Migration(forward=[], backward=[])
+        migrations = migration_history[-n:] # Take last n elements of migration history for execution
+        
+        # Loop in reversed order as we execute backward migrations in reversed order compared to forward ones
+        for migration_dict in reversed(migrations):
+            total_backward_migration.forward.append(migration_dict["forward"])
+            total_backward_migration.backward.append(migration_dict["backward"])
+            
+        self.set_current_migration(asdict(total_backward_migration))
+        self.migrate_backward()
+    
     def load_migration_from_json(self, json_file_path: str = CURRENT_MIGRATION_DEFAULT_PATH):
         with open(json_file_path, "r") as file:
             migration_dict = json.load(file)
