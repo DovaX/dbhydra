@@ -116,4 +116,7 @@ class Migrator:
             return_types.insert(0, "int")
 
         return columns, return_types
+    
+    def set_current_migration(self, migration_dict: dict[str, list]):
+        self.current_migration = Migration(**migration_dict)
 
