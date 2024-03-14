@@ -119,4 +119,11 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    def _build_folder_structure_for_file_path(self, file_path: str):
+        folder_path = os.path.dirname(file_path)
+        if not os.path.exists(folder_path):
+            print(f"Folder path to the file '{file_path}' does not exist. Creating the file and the folder structure.")
+            os.makedirs(folder_path)
+        
+
 
