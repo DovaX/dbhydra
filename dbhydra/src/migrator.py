@@ -119,6 +119,20 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    def _read_migration_history_json(self, file_path: str = MIGRATION_HISTORY_DEFAULT_PATH):
+        if not file_path.endswith(".json"):
+            raise ValueError("Migration history file must be of '.json' type.")
+        
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Migration history file '{file_path}' does not exist.")
+        
+        try:
+            with open(file_path, "r") as file:
+                migration_history = json.load(file)
+        except json.JSONDecodeError:
+            migration_history = []
+            
+        return migration_history
     def _build_folder_structure_for_file_path(self, file_path: str):
         folder_path = os.path.dirname(file_path)
         if not os.path.exists(folder_path):
