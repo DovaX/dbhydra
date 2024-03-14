@@ -119,6 +119,137 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    def create_table_migration(self, table_name: str, old_structure: Optional[dict], new_structure: Optional[dict]):
+        """
+        Creates a migration for a database table based on its old and new structures.
+
+        Args:
+            table_name (str): The name of the database table.
+            old_structure (Optional[dict]): The old structure of the table.
+            new_structure (Optional[dict]): The new structure of the table.
+
+            If old_structure is None and new_structure is not None: CREATE table
+            If old_structure is not None and new_structure is None: DROP table
+
+        Returns:
+            Migration: The generated migration object.
+
+        Raises:
+            ValueError: If the table_name argument is empty.
+        """
+    
+        if not table_name:
+            raise ValueError("The 'table_name' argument must be a non-empty string.")
+
+        if not old_structure and new_structure:
+            # non-empty initial structure --> empty new structure
+            columns, types = list(new_structure.keys()), list(new_structure.values())
+            forward_migration = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
+            backward_migration = [{"drop": {"table_name": table_name}}]
+            
+            migration = Migration(forward=forward_migration, backward=backward_migration)
+        elif not new_structure:
+            # new structure is empty ==> drop the table
+            forward_migration = [{"drop": {"table_name": table_name}}]
+            backward_migration = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
+            
+            migration = Migration(forward=forward_migration, backward=backward_migration)
+        else:
+            diff = DeepDiff(old_structure, new_structure, verbose_level=2)
+            migration = self._convert_deepdiff_dict_into_migration(table_name, diff)
+            
+        self._merge_migration_to_current_migration(migration=migration)
+
+        return migration
+
+    def _convert_deepdiff_dict_into_migration(self, table_name: str, deepdiff_dict: dict) -> Migration:
+        """
+        Converts deepdiff dictionary from the new and old table structures comparison into a Migration object.
+
+        Args:
+            table_name (str): A name of the examined DB table.
+            deepdiff_dict (dict): A dictionary from DeepDiff comparison of the old and new table structure.
+
+        Returns:
+            Migration: A Migration object containing forward and backward migrations for the given table.
+            
+        Example:
+            >>> table_name = 'results'
+            >>> deepdiff_dict = {'dictionary_item_removed': {"root['hehexd']": 'double'}}
+            >>> migrator = Migrator()
+            >>> asdict(migrator._convert_deepdiff_dict_into_migration)
+            >>> {
+                'forward': [
+                    {'drop_column': {'table_name': 'results', 'column_name': 'hehexd'}}
+                    ],
+                'backward': [
+                    {'add_column': {'table_name': 'results', 'column_name': 'hehexd', 'column_type': 'double'}}
+                    ]
+                }
+        """
+        forward_migration, backward_migration = [], []
+
+        forward_conversions = {
+            "dictionary_item_added": "add_column",
+            "dictionary_item_removed": "drop_column",
+            "values_changed": "modify_column"
+            }
+        backward_conversions = {
+            "dictionary_item_added": "drop_column",
+            "dictionary_item_removed": "add_column",
+            "values_changed": "modify_column"
+            }
+
+        for action_name, deepdiff_action in deepdiff_dict.items():
+            for deepdiff_key in deepdiff_action.keys():
+                column_name = self._extract_column_name_from_deepdiff_key(deepdiff_key)
+                forward_action, backward_action = forward_conversions[action_name], backward_conversions[action_name]
+                
+                if action_name=="dictionary_item_added":
+                    column_type = deepdiff_action[deepdiff_key]
+                    forward_migration.append({forward_action: {"table_name": table_name, "column_name": column_name, "column_type": column_type}})
+                    backward_migration.append({backward_action: {"table_name": table_name, "column_name": column_name}})
+                elif action_name=="dictionary_item_removed":
+                    column_type = deepdiff_action[deepdiff_key]
+                    forward_migration.append({forward_action: {"table_name": table_name, "column_name": column_name}})
+                    backward_migration.append({backward_action: {"table_name": table_name, "column_name": column_name, "column_type": column_type}})
+                elif action_name=="values_changed":
+                    column_type = deepdiff_action[deepdiff_key]["old_value"]
+                    column_new_type = deepdiff_action[deepdiff_key]["new_value"]
+                    forward_migration.append({forward_action: {"table_name": table_name, "column_name": column_name,
+                                                        "column_type": column_new_type}})
+                    backward_migration.append({backward_action: {"table_name": table_name, "column_name": column_name,
+                                                        "column_type": column_type}})
+            
+        return Migration(forward=forward_migration, backward=backward_migration)
+    
+    def _extract_column_name_from_deepdiff_key(self, deepdiff_key: str) -> str:
+        """
+        Extracts the column name from a key generated by deepdiff.
+
+        Args:
+            deepdiff_key (str): The key generated by deepdiff.
+
+        Returns:
+            str: The extracted column name.
+
+        Example:
+            >>> migrator = Migrator()
+            >>> column_name = migrator._extract_column_name_from_deepdiff_key("root['table']['column']")
+            >>> print(column_name)
+            'column'
+        """
+        
+        # Split the item_key by '[' and ']' to isolate the column name
+        # The column name is expected to be the last element after splitting
+        column_name = deepdiff_key.split('[')[-1].strip("']")
+        return column_name
+    
+    def _merge_migration_to_current_migration(self, migration: Migration):
+        new_forward_part = self.current_migration.forward + migration.forward
+        new_backward_part = self.current_migration.backward + migration.backward
+        self.current_migration = Migration(forward=new_forward_part, backward=new_backward_part)
+        
     def _clear_current_migration(self):
         self.current_migration = Migration(forward=[], backward=[])
         
