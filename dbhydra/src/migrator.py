@@ -119,6 +119,9 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    def _clear_current_migration(self):
+        self.current_migration = Migration(forward=[], backward=[])
+        
     def _read_migration_history_json(self, file_path: str = MIGRATION_HISTORY_DEFAULT_PATH):
         if not file_path.endswith(".json"):
             raise ValueError("Migration history file must be of '.json' type.")
