@@ -79,6 +79,7 @@ class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
+        self.identifier_quote = '"'
 
         print("==========================================")
 
@@ -610,6 +611,7 @@ class MysqlTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns, types)
         self.id_column_name = id_column_name
+        self.identifier_quote = '`'
 
     #Disabled because it is inherited
     # @classmethod
@@ -634,7 +636,7 @@ class MysqlTable(AbstractTable):
 
     def get_all_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '{self.name}';"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = `{self.name}`;"
         columns = information_schema_table.select(query, flattening_of_results=True)
 
         return columns
@@ -655,7 +657,7 @@ class MysqlTable(AbstractTable):
     """
     def get_data_types_and_character_lengths(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = `" + self.name + "`"
         types = information_schema_table.select(query)
         data_types = [x[0] for x in types]
         data_lengths = [x[1] for x in types]
@@ -689,7 +691,7 @@ class MysqlTable(AbstractTable):
 
     def get_nullable_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = '{self.name}' and IS_NULLABLE = 'YES'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = `{self.name}` and IS_NULLABLE = 'YES'"
         nullable_columns = information_schema_table.select(query)
         return (nullable_columns)
 
@@ -725,12 +727,12 @@ class MysqlTable(AbstractTable):
         Returns the number of records in table
         """
 
-        num_of_records = self.select(f"SELECT COUNT(*) FROM {self.name};")
+        num_of_records = self.select(f"SELECT COUNT(*) FROM `{self.name}`;")
 
         return num_of_records[0][0]
 
     def drop(self):
-        query = "DROP TABLE " + self.name + ";"
+        query = "DROP TABLE `" + self.name + "`;"
         print(query)
         self.db1.execute(query)
 
@@ -742,9 +744,9 @@ class MysqlTable(AbstractTable):
 
         column_type_pairs = list(zip(self.columns, self.types))[1:]
         fields = ", ".join(
-            [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
+            [f"`{column}` {type_.upper()}" for column, type_ in column_type_pairs]
         )
-        query = f"CREATE TABLE {self.name} ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
+        query = f"CREATE TABLE `{self.name}` ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -762,11 +764,8 @@ class MysqlTable(AbstractTable):
                 query = "INSERT INTO " + self.name + " ("
                 for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
-                        # column name containing space needs to be wrapped in `...`, otherwise causes syntax error
-                        if " " in self.columns[i]:
-                            column_name = '`' + self.columns[i] + '`'
-                        else:
-                            column_name = self.columns[i]
+                        # column name containing space/reserved keyword needs to be wrapped in `...`, otherwise causes syntax error
+                        column_name = '`' + self.columns[i] + '`'
                         query += column_name + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
@@ -846,17 +845,17 @@ class MysqlTable(AbstractTable):
     def add_foreign_key(self, foreign_key):
         parent_id = foreign_key['parent_id']
         parent = foreign_key['parent']
-        query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
+        query = "ALTER TABLE `" + self.name + "` MODIFY " + parent_id + " INT UNSIGNED"
         print(query)
         self.db1.execute(query)
-        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
+        query = "ALTER TABLE `" + self.name + "` ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
         print(query)
         self.db1.execute(query)
 
     @save_migration
     def add_column(self, column_name, column_type):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        command = "ALTER TABLE `" + self.name + "` ADD COLUMN `" + column_name + "` " + column_type
         try:
             self.db1.execute(command)
             self.columns.append(column_name)
@@ -867,7 +866,7 @@ class MysqlTable(AbstractTable):
     @save_migration
     def drop_column(self, column_name):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " DROP COLUMN " + column_name
+        command = "ALTER TABLE `" + self.name + "` DROP COLUMN " + column_name
         try:
             print(command)
             self.db1.execute(command)
@@ -881,7 +880,7 @@ class MysqlTable(AbstractTable):
     @save_migration
     def modify_column(self, column_name, new_column_type):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " MODIFY COLUMN " + column_name + " " + new_column_type
+        command = "ALTER TABLE `" + self.name + "` MODIFY COLUMN `" + column_name + "` " + new_column_type
         print(command)
         try:
             self.db1.execute(command)

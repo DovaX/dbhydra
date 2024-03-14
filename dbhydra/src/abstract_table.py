@@ -132,12 +132,13 @@ class AbstractSelectable:
             
 
     def select_all(self):
+        quote = getattr(self, 'identifier_quote', '')
         all_cols_query = ""
         for col in self.columns:
-            all_cols_query = all_cols_query + col + ","
+            all_cols_query = all_cols_query + quote + col + quote + ","
         if all_cols_query[-1] == ",":
             all_cols_query = all_cols_query[:-1]
-        list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
+        list1 = self.select(f"SELECT {all_cols_query} FROM {quote}{self.name}{quote};")
         return (list1)
 
     def select_to_df(self):
