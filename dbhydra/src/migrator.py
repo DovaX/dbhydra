@@ -10,10 +10,11 @@ class Migration:
 class Migrator:
     """It was somewhat tested only for MySQL and Postgres dialect"""
     
-    def __init__(self, db=None):
+    def __init__(self, db):
         self.db = db
         self.migration_number = 1
         self.migration_list = []
+        self.current_migration = Migration(forward=[], backward=[])
 
     def process_migration_dict(self, migration_dict):
         matching_table_class = self.db.matching_table_class #E.g. MysqlTable
