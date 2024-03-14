@@ -2,6 +2,10 @@ import pandas as pd
 import math
 import json
 
+@dataclass
+class Migration:
+    forward: list[dict]
+    backward: list[dict]
 
 class Migrator:
     """It was somewhat tested only for MySQL and Postgres dialect"""
