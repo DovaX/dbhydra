@@ -133,6 +133,19 @@ class Migrator:
             migration_history = []
             
         return migration_history
+        
+    def _save_migration_to_history(self, migration: Migration, file_path: str = MIGRATION_HISTORY_DEFAULT_PATH):            
+        try:
+            migration_history = self._read_migration_history_json(file_path)
+        except FileNotFoundError:
+            self._build_folder_structure_for_file_path(file_path)
+            migration_history = []
+            
+        migration_history.append(asdict(migration))
+        
+        with open(file_path, "w") as file:
+            json.dump(migration_history, file, indent=2)
+            
     def _build_folder_structure_for_file_path(self, file_path: str):
         folder_path = os.path.dirname(file_path)
         if not os.path.exists(folder_path):
