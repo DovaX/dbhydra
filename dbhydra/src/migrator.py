@@ -119,6 +119,42 @@ class Migrator:
     
     def set_current_migration(self, migration_dict: dict[str, list]):
         self.current_migration = Migration(**migration_dict)
+    
+    def migrate_forward(self):
+        """
+        Applies forward migrations from the current migration object.
+
+        Iterates through each migration dictionary in the current migration's forward list,
+        processes the migration, saves it to migration history, and clears the current migration.
+
+        Returns:
+            None
+        """
+            
+        for migration_dict in self.current_migration.forward:
+            self.process_migration_dict(migration_dict)
+            
+        self._save_migration_to_history(migration=self.current_migration)
+        self._clear_current_migration()
+            
+    def migrate_backward(self):
+        """
+        Applies backward migrations from the current migration object.
+
+        Iterates through each migration dictionary in the current migration's backward list,
+        processes the migration, saves it to migration history, and clears the current migration.
+
+        Returns:
+            None
+        """
+        
+        for migration_dict in self.current_migration.backward:
+            self.process_migration_dict(migration_dict)
+            
+        history_migration = Migration(forward=self.current_migration.backward, backward=self.current_migration.forward)
+        self._save_migration_to_history(migration=history_migration)
+        self._clear_current_migration()
+        
     def load_migration_from_json(self, json_file_path: str = CURRENT_MIGRATION_DEFAULT_PATH):
         with open(json_file_path, "r") as file:
             migration_dict = json.load(file)
