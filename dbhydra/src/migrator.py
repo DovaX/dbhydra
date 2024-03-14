@@ -33,9 +33,13 @@ class Migrator:
     
     def __init__(self, db):
         self.db = db
-        self.migration_number = 1
-        self.migration_list = []
-        self.current_migration = Migration(forward=[], backward=[])
+        
+        # Used in older implementations, TODO: decide whether to keep both approaches, unify them or pick one
+        self._migration_number = 1
+        self._migration_list = []
+        
+        # Used in newer approach
+        self._current_migration = Migration(forward=[], backward=[])
 
     def process_migration_dict(self, migration_dict):
         matching_table_class = self.db.matching_table_class #E.g. MysqlTable
@@ -68,9 +72,10 @@ class Migrator:
             table.initialize_types()
             table.drop_column(options["column_name"])
 
+    # Old approach methods START
     def next_migration(self):
-        self.migration_number += 1
-        self.migration_list = []
+        self._migration_number += 1
+        self._migration_list = []
 
     def migrate(self, migration_list):
         for i, migration_dict in enumerate(migration_list):
@@ -85,10 +90,10 @@ class Migrator:
         return (result)
 
     def migration_list_to_json(self, filename=None):
-        result = json.dumps(self.migration_list)
+        result = json.dumps(self._migration_list)
 
         if filename is None or filename == "" or filename.isspace():
-            with open("migrations/migration-" + str(self.migration_number) + ".json", "w+") as f:
+            with open("migrations/migration-" + str(self._migration_number) + ".json", "w+") as f:
                 f.write(result)
         else:
             with open(f"migrations/{filename}.json", "w+") as f:
@@ -99,7 +104,7 @@ class Migrator:
         columns, return_types = self.extract_columns_and_types_from_df(dataframe)
 
         migration_dict = {"create": {"table_name": name, "columns": columns, "types": return_types}}
-        self.migration_list.append(migration_dict)
+        self._migration_list.append(migration_dict)
         self.migration_list_to_json()
         # return columns, return_types
 
@@ -137,9 +142,10 @@ class Migrator:
             return_types.insert(0, "int")
 
         return columns, return_types
+    # Old approach methods END
     
     def set_current_migration(self, migration_dict: dict[str, list]):
-        self.current_migration = Migration(**migration_dict)
+        self._current_migration = Migration(**migration_dict)
     
     def migrate_forward(self):
         """
@@ -152,10 +158,10 @@ class Migrator:
             None
         """
             
-        for migration_dict in self.current_migration.forward:
+        for migration_dict in self._current_migration.forward:
             self.process_migration_dict(migration_dict)
             
-        self._save_migration_to_history(migration=self.current_migration)
+        self._save_migration_to_history(migration=self._current_migration)
         self._clear_current_migration()
             
     def migrate_backward(self):
@@ -169,10 +175,10 @@ class Migrator:
             None
         """
         
-        for migration_dict in self.current_migration.backward:
+        for migration_dict in self._current_migration.backward:
             self.process_migration_dict(migration_dict)
             
-        history_migration = Migration(forward=self.current_migration.backward, backward=self.current_migration.forward)
+        history_migration = Migration(forward=self._current_migration.backward, backward=self._current_migration.forward)
         self._save_migration_to_history(migration=history_migration)
         self._clear_current_migration()
         
@@ -206,7 +212,7 @@ class Migrator:
         self._build_folder_structure_for_file_path(file_path)
         
         with open(file_path, "w+") as file:
-            json.dump(asdict(self.current_migration), file, indent=2)
+            json.dump(asdict(self._current_migration), file, indent=2)
     
     def create_table_migration(self, table_name: str, old_structure: Optional[dict], new_structure: Optional[dict]):
         """
@@ -345,12 +351,12 @@ class Migrator:
         return column_name
     
     def _merge_migration_to_current_migration(self, migration: Migration):
-        new_forward_part = self.current_migration.forward + migration.forward
-        new_backward_part = self.current_migration.backward + migration.backward
-        self.current_migration = Migration(forward=new_forward_part, backward=new_backward_part)
+        new_forward_part = self._current_migration.forward + migration.forward
+        new_backward_part = self._current_migration.backward + migration.backward
+        self._current_migration = Migration(forward=new_forward_part, backward=new_backward_part)
         
     def _clear_current_migration(self):
-        self.current_migration = Migration(forward=[], backward=[])
+        self._current_migration = Migration(forward=[], backward=[])
         
     def _read_migration_history_json(self, file_path: str = MIGRATION_HISTORY_DEFAULT_PATH):
         if not file_path.endswith(".json"):
