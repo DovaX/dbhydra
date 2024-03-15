@@ -689,7 +689,7 @@ class MysqlTable(AbstractTable):
 
     def get_nullable_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = `{self.name}` and IS_NULLABLE = 'YES'"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '{self.db1.DB_DATABASE}' and TABLE_NAME = '{self.name}' and IS_NULLABLE = 'YES'"
         nullable_columns = information_schema_table.select(query)
         return (nullable_columns)
 
