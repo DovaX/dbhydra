@@ -79,7 +79,6 @@ class PostgresTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None):
         super().__init__(db1, name, columns)
         self.types = types
-        self.identifier_quote = '"'
 
         print("==========================================")
 
@@ -611,7 +610,6 @@ class MysqlTable(AbstractTable):
     def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
         super().__init__(db1, name, columns, types)
         self.id_column_name = id_column_name
-        self.identifier_quote = '`'
 
     #Disabled because it is inherited
     # @classmethod
@@ -636,7 +634,7 @@ class MysqlTable(AbstractTable):
 
     def get_all_columns(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS')
-        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = `{self.name}`;"
+        query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '{self.name}';"
         columns = information_schema_table.select(query, flattening_of_results=True)
 
         return columns
@@ -657,7 +655,7 @@ class MysqlTable(AbstractTable):
     """
     def get_data_types_and_character_lengths(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = `" + self.name + "`"
+        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '{self.name}'"
         types = information_schema_table.select(query)
         data_types = [x[0] for x in types]
         data_lengths = [x[1] for x in types]
@@ -761,7 +759,7 @@ class MysqlTable(AbstractTable):
         total_output=[]
         for k in range(len(rows)):
             if k % batch == 0:
-                query = "INSERT INTO " + self.name + " ("
+                query = "INSERT INTO `" + self.name + "` ("
                 for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
                         # column name containing space/reserved keyword needs to be wrapped in `...`, otherwise causes syntax error
