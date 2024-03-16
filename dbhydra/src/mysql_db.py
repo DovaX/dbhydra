@@ -39,6 +39,9 @@ class MysqlDb(AbstractDb):
         print("DB connection established")
 
     def create_new_db(self):
+        self.connection = pymysql.connect(host=self.DB_SERVER, port=self.DB_PORT, user=self.DB_USERNAME, 
+                                          charset="utf8mb4", password=self.DB_PASSWORD)
+        self.cursor = self.connection.cursor()
         create_db_command = "CREATE DATABASE " + self.DB_DATABASE
         self.execute(create_db_command)
 
