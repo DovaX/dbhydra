@@ -105,6 +105,7 @@ class AbstractDb(abc.ABC):
         
         self.active_transactions=[]
         self.last_table_inserted_into: Optional[str] = None
+        self.identifier_quote = ''
 
     @abc.abstractmethod
     def connect_locally(self):
