@@ -1,6 +1,6 @@
 # dbhydra
 Data science friendly ORM (Object Relational Mapping) library combining Python, Pandas, and various SQL dialects
-For full documentation see official [documentation](http://app.forloop.ai/dbhydra/documentation)
+For full documentation see official [documentation](http://app.forloop.ai/dbhydra/documentation) - currently unavailable but we're working on it!
 
 ## Installation
 
