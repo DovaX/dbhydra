@@ -32,7 +32,6 @@ class BigQueryDb(AbstractDb):
         self.client.close()
 
     def select_to_df(self, query):
-        print(query)
         df = pd.read_gbq(query=query, project_id=self.project_id, credentials=self.credentials)
 
         return df

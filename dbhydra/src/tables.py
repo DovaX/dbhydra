@@ -151,7 +151,7 @@ class PostgresTable(AbstractTable):
 
         query = query[:-1]
         query += ");"
-        print(query)
+        
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -297,7 +297,6 @@ class BigQueryTable(AbstractSelectable):
 
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        print(query)
         # rows =  self.db1.client.query(query).result()
         rows = self.db1.execute(query)
         return rows
@@ -504,7 +503,6 @@ class SqlServerTable(AbstractTable):
             query += self.columns[i] + " " + self.types[i] + ","
         query += "PRIMARY KEY("+self.id_column_name+"))"
 
-        print(query)
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -730,8 +728,8 @@ class MysqlTable(AbstractTable):
         return num_of_records[0][0]
 
     def drop(self):
-        query = "DROP TABLE `" + self.name + "`;"
-        print(query)
+        query = "DROP TABLE " + self.name + ";"
+        
         self.db1.execute(query)
 
     # @save_migration #TODO: Uncomment
@@ -746,7 +744,6 @@ class MysqlTable(AbstractTable):
         )
         query = f"CREATE TABLE `{self.name}` ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
-        print(query)
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -843,11 +840,11 @@ class MysqlTable(AbstractTable):
     def add_foreign_key(self, foreign_key):
         parent_id = foreign_key['parent_id']
         parent = foreign_key['parent']
-        query = "ALTER TABLE `" + self.name + "` MODIFY " + parent_id + " INT UNSIGNED"
-        print(query)
+        query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
+        
         self.db1.execute(query)
-        query = "ALTER TABLE `" + self.name + "` ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
-        print(query)
+        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
+        
         self.db1.execute(query)
 
     @save_migration
