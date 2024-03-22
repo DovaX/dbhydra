@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Any
 import abc
-
+import time
 #xlsx imports
 import pathlib
 
@@ -655,7 +655,7 @@ class MysqlTable(AbstractTable):
     """
     def get_data_types_and_character_lengths(self):
         information_schema_table = MysqlTable(self.db1, 'INFORMATION_SCHEMA.COLUMNS', ['DATA_TYPE'], ['nvarchar(50)'])
-        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '" + self.name + "'"
+        query = f"SELECT DATA_TYPE,character_maximum_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{self.db1.DB_DATABASE}' AND TABLE_NAME  = '{self.name}'"
         types = information_schema_table.select(query)
         data_types = [x[0] for x in types]
         data_lengths = [x[1] for x in types]
@@ -725,12 +725,12 @@ class MysqlTable(AbstractTable):
         Returns the number of records in table
         """
 
-        num_of_records = self.select(f"SELECT COUNT(*) FROM {self.name};")
+        num_of_records = self.select(f"SELECT COUNT(*) FROM `{self.name}`;")
 
         return num_of_records[0][0]
 
     def drop(self):
-        query = "DROP TABLE " + self.name + ";"
+        query = "DROP TABLE `" + self.name + "`;"
         print(query)
         self.db1.execute(query)
 
@@ -742,9 +742,9 @@ class MysqlTable(AbstractTable):
 
         column_type_pairs = list(zip(self.columns, self.types))[1:]
         fields = ", ".join(
-            [f"{column} {type_.upper()}" for column, type_ in column_type_pairs]
+            [f"`{column}` {type_.upper()}" for column, type_ in column_type_pairs]
         )
-        query = f"CREATE TABLE {self.name} ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
+        query = f"CREATE TABLE `{self.name}` ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
 
         print(query)
         try:
@@ -759,14 +759,11 @@ class MysqlTable(AbstractTable):
         total_output=[]
         for k in range(len(rows)):
             if k % batch == 0:
-                query = "INSERT INTO " + self.name + " ("
+                query = "INSERT INTO `" + self.name + "` ("
                 for i in range(start_index, len(self.columns)):
                     if i < len(rows[k]) + 1:
-                        # column name containing space needs to be wrapped in `...`, otherwise causes syntax error
-                        if " " in self.columns[i]:
-                            column_name = '`' + self.columns[i] + '`'
-                        else:
-                            column_name = self.columns[i]
+                        # column name containing space/reserved keyword needs to be wrapped in `...`, otherwise causes syntax error
+                        column_name = '`' + self.columns[i] + '`'
                         query += column_name + ","
                 if len(rows) < len(self.columns):
                     print(len(self.columns) - len(rows), "columns were not specified")
@@ -846,17 +843,17 @@ class MysqlTable(AbstractTable):
     def add_foreign_key(self, foreign_key):
         parent_id = foreign_key['parent_id']
         parent = foreign_key['parent']
-        query = "ALTER TABLE " + self.name + " MODIFY " + parent_id + " INT UNSIGNED"
+        query = "ALTER TABLE `" + self.name + "` MODIFY " + parent_id + " INT UNSIGNED"
         print(query)
         self.db1.execute(query)
-        query = "ALTER TABLE " + self.name + " ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
+        query = "ALTER TABLE `" + self.name + "` ADD FOREIGN KEY (" + parent_id + ") REFERENCES " + parent + "("+self.id_column_name+")"
         print(query)
         self.db1.execute(query)
 
     @save_migration
     def add_column(self, column_name, column_type):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " ADD COLUMN " + column_name + " " + column_type
+        command = "ALTER TABLE `" + self.name + "` ADD COLUMN `" + column_name + "` " + column_type
         try:
             self.db1.execute(command)
             self.columns.append(column_name)
@@ -867,7 +864,7 @@ class MysqlTable(AbstractTable):
     @save_migration
     def drop_column(self, column_name):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " DROP COLUMN " + column_name
+        command = "ALTER TABLE `" + self.name + "` DROP COLUMN " + column_name
         try:
             print(command)
             self.db1.execute(command)
@@ -881,7 +878,7 @@ class MysqlTable(AbstractTable):
     @save_migration
     def modify_column(self, column_name, new_column_type):
         assert len(column_name) > 1
-        command = "ALTER TABLE " + self.name + " MODIFY COLUMN " + column_name + " " + new_column_type
+        command = "ALTER TABLE `" + self.name + "` MODIFY COLUMN `" + column_name + "` " + new_column_type
         print(command)
         try:
             self.db1.execute(command)
@@ -894,9 +891,10 @@ class MysqlTable(AbstractTable):
 ############### XLSX ##################
 
 class XlsxTable(AbstractTable):
-    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id"):
+    def __init__(self, db1, name, columns=None, types=None, id_column_name = "id", number_of_retries=5):
         super().__init__(db1, name, columns, types)
         self.id_column_name = id_column_name
+        self.NUMBER_OF_RETRIES = number_of_retries
 
         table_filename = f"{self.name}.csv" if self.db1.is_csv else f"{self.name}.xlsx"
         self.table_directory_path: pathlib.Path = self.db1.db_directory_path / table_filename
@@ -960,23 +958,33 @@ class XlsxTable(AbstractTable):
             column for column, type_ in self.column_type_dict.items() if type_ == "datetime"
         ]
 
-        try:
-            if self.db1.is_csv:
-                df = pd.read_csv(
-                    self.table_directory_path, dtype=column_type_map,
-                    parse_dates=date_columns, encoding='utf-8'
-                )
-            else:
-                df = pd.read_excel(
-                    self.table_directory_path, dtype=column_type_map, 
-                    parse_dates=date_columns
-                )
+        # BUG: If XlsxTable is being accessed by multiple threads, read operation
+        # might fail due to race conditions. Add retry mechanism to handle these cases.
+        for attempt in range(self.NUMBER_OF_RETRIES):
+            try:
+                df = self._select(column_type_map, date_columns)
+            except Exception:
+                # print(f"Error while reading data into XlsxTable: {e}")
+                # df = pd.DataFrame(columns=self.columns)
+                if attempt < self.NUMBER_OF_RETRIES:
+                    time.sleep(0.1)
+                    continue
+                else:
+                    print(f"Failed to read data from {self.table_directory_path}, returning empty DataFrame")
+                    df = pd.DataFrame(columns=self.columns)
+        return df
 
-            df.replace({np.nan: None}, inplace=True)
-        except Exception as e:
-            print(f"Error while reading data into XlsxTable: {e}")
-            df = pd.DataFrame(columns=self.columns)
-
+    def _select(self, column_type_map, date_columns):
+        if self.db1.is_csv:
+            df = pd.read_csv(
+                self.table_directory_path, dtype=column_type_map, parse_dates=date_columns,
+                encoding='utf-8'
+            )
+        else:
+            df = pd.read_excel(
+                self.table_directory_path, dtype=column_type_map, parse_dates=date_columns
+            )
+        df.replace({np.nan: None}, inplace=True)
         return df
 
     def insert_from_df(self, df, batch=1, try_mode=False, debug_mode=False, adjust_df=False, insert_id=False):

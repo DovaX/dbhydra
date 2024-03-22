@@ -22,6 +22,10 @@ class MysqlDb(AbstractDb):
     'Jsonable': "json"
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.identifier_quote = '`'
+
     def connect_locally(self):
         self.connection = pymysql.connect(host=self.DB_SERVER, user=self.DB_USERNAME, password=self.DB_PASSWORD,
                                           database=self.DB_DATABASE)

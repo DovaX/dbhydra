@@ -132,12 +132,13 @@ class AbstractSelectable:
             
 
     def select_all(self):
+        quote = self.db1.identifier_quote
         all_cols_query = ""
         for col in self.columns:
-            all_cols_query = all_cols_query + col + ","
+            all_cols_query = all_cols_query + quote + col + quote + ","
         if all_cols_query[-1] == ",":
             all_cols_query = all_cols_query[:-1]
-        list1 = self.select(f"SELECT {all_cols_query} FROM " + self.name)
+        list1 = self.select(f"SELECT {all_cols_query} FROM {quote}{self.name}{quote};")
         return (list1)
 
     def select_to_df(self):
@@ -244,7 +245,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             self.column_type_dict={self.columns[i]:self.types[i] for i,x in enumerate(self.columns)}
         else:
             self.column_type_dict={}
-        
 
     # Temporary disabled, please make sure this is implemented where needed, don't introduce breaking changes please
     # @abc.abstractmethod
@@ -421,11 +421,12 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
 
     def delete(self, where=None):
+        quote = self.db1.identifier_quote
 
         if where is None:
-            query = "DELETE FROM " + self.name
+            query = "DELETE FROM {quote}{self.name}{quote}"
         else:
-            query = "DELETE FROM " + self.name + " WHERE " + where
+            query = f"DELETE FROM {quote}{self.name}{quote} WHERE {where}"
         return self.execute(query)
 
 
