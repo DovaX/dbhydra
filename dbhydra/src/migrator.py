@@ -10,10 +10,10 @@ from dataclasses import dataclass, asdict
 PENDING_MIGRATION_DEFAULT_PATH = "./db/migrations/pending_migration.json"
 MIGRATION_HISTORY_DEFAULT_PATH = "./db/migrations/migration_history.json"
 
-@dataclass
-class Migration:
-    forward: list[dict]
-    backward: list[dict]
+# @dataclass
+# class Migration:
+#     forward: list[dict]
+#     backward: list[dict]
 
 class Migrator:
     """
@@ -39,7 +39,8 @@ class Migrator:
         self._migration_list = []
         
         # Used in newer approach
-        self._pending_migration = Migration(forward=[], backward=[])
+        self._pending_forward_migration_list = []#Migration(forward=[], backward=[])
+        self._pending_forward_migration_list = []#Migration(forward=[], backward=[])
 
     def process_migration_dict(self, migration_dict):
         matching_table_class = self.db.matching_table_class #E.g. MysqlTable
@@ -164,8 +165,8 @@ class Migrator:
     
   
     
-    def set_pending_migration(self, migration_dict: dict[str, list]):
-        self._pending_migration = Migration(**migration_dict)
+    # def set_pending_migration(self, migration_dict: dict[str, list]):
+    #     self._pending_migration = Migration(**migration_dict)
     
     def migrate_forward(self):
         """
@@ -178,10 +179,10 @@ class Migrator:
             None
         """
             
-        for migration_dict in self._pending_migration.forward:
+        for migration_dict in self._pending_forward_migration_list:
             self.process_migration_dict(migration_dict)
             
-        self._save_migration_to_history(migration=self._pending_migration)
+        #self._save_migration_to_history(migration=self._pending_migration)
         self._clear_pending_migration()
             
     def migrate_backward(self):
@@ -195,44 +196,44 @@ class Migrator:
             None
         """
         
-        for migration_dict in self._pending_migration.backward:
+        for migration_dict in self._pending_backward_migration_list:
             self.process_migration_dict(migration_dict)
             
-        history_migration = Migration(forward=self._pending_migration.backward, backward=self._pending_migration.forward)
-        self._save_migration_to_history(migration=history_migration)
+        #history_migration = Migration(forward=self._pending_migration.backward, backward=self._pending_migration.forward)
+        #self._save_migration_to_history(migration=history_migration)
         self._clear_pending_migration()
         
-    def migrate_n_steps_back_in_history(self, n: int, migration_history_json: str = MIGRATION_HISTORY_DEFAULT_PATH):        
-        migration_history = self._read_migration_history_json(migration_history_json)
+    # def migrate_n_steps_back_in_history(self, n: int, migration_history_json: str = MIGRATION_HISTORY_DEFAULT_PATH):        
+    #     migration_history = self._read_migration_history_json(migration_history_json)
         
-        if len(migration_history) < n:
-            raise ValueError(f"Provided n (= {n}) is larger than migration history length (= {len(migration_history)}).")
+    #     if len(migration_history) < n:
+    #         raise ValueError(f"Provided n (= {n}) is larger than migration history length (= {len(migration_history)}).")
 
-        total_backward_migration = Migration(forward=[], backward=[])
-        migrations = migration_history[-n:] # Take last n elements of migration history for execution
+    #     total_backward_migration = Migration(forward=[], backward=[])
+    #     migrations = migration_history[-n:] # Take last n elements of migration history for execution
         
-        # Loop in reversed order as we execute backward migrations in reversed order compared to forward ones
-        for migration_dict in reversed(migrations):
-            total_backward_migration.forward.append(migration_dict["forward"])
-            total_backward_migration.backward.append(migration_dict["backward"])
+    #     # Loop in reversed order as we execute backward migrations in reversed order compared to forward ones
+    #     for migration_dict in reversed(migrations):
+    #         total_backward_migration.forward.append(migration_dict["forward"])
+    #         total_backward_migration.backward.append(migration_dict["backward"])
             
-        self.set_pending_migration(asdict(total_backward_migration))
-        self.migrate_backward()
+    #     self.set_pending_migration(asdict(total_backward_migration))
+    #     self.migrate_backward()
     
-    def load_migration_from_json(self, json_file_path: str = PENDING_MIGRATION_DEFAULT_PATH):
-        with open(json_file_path, "r") as file:
-            migration_dict = json.load(file)
+    # def load_migration_from_json(self, json_file_path: str = PENDING_MIGRATION_DEFAULT_PATH):
+    #     with open(json_file_path, "r") as file:
+    #         migration_dict = json.load(file)
             
-        self.set_pending_migration(migration_dict)
+    #     self.set_pending_migration(migration_dict)
     
-    def save_pending_migration_to_json(self, file_path: str = PENDING_MIGRATION_DEFAULT_PATH):
-        if not file_path.endswith(".json"):
-            raise ValueError("pending migration file must be of '.json' type.")
+    # def save_pending_migration_to_json(self, file_path: str = PENDING_MIGRATION_DEFAULT_PATH):
+    #     if not file_path.endswith(".json"):
+    #         raise ValueError("pending migration file must be of '.json' type.")
         
-        self._build_folder_structure_for_file_path(file_path)
+    #     self._build_folder_structure_for_file_path(file_path)
         
-        with open(file_path, "w+") as file:
-            json.dump(asdict(self._pending_migration), file, indent=2)
+    #     with open(file_path, "w+") as file:
+    #         json.dump(asdict(self._pending_migration), file, indent=2)
     
     def create_table_migration(self, table_name: str, old_column_type_dict: Optional[dict], new_column_type_dict: Optional[dict]):
         """
@@ -275,7 +276,7 @@ class Migrator:
             column_name = deepdiff_key.split('[')[-1].strip("']")
             return column_name
         
-        def _convert_deepdiff_dict_into_migration_lists(table_name: str, deepdiff_dict: dict) -> Migration:
+        def _convert_deepdiff_dict_into_migration_lists(table_name: str, deepdiff_dict: dict):
             """
             Converts deepdiff dictionary from the new and old table column_type_dicts comparison into a Migration object.
 
@@ -355,35 +356,37 @@ class Migrator:
         if not old_column_type_dict and new_column_type_dict:
             # non-empty initial column_type_dict --> empty new column_type_dict
             columns, types = list(new_column_type_dict.keys()), list(new_column_type_dict.values())
-            forward_migration = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
-            backward_migration = [{"drop": {"table_name": table_name}}]
+            forward_migration_list = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
+            backward_migration_list = [{"drop": {"table_name": table_name}}]
             
-            migration = Migration(forward=forward_migration, backward=backward_migration)
         elif not new_column_type_dict:
             # new column_type_dict is empty ==> drop the table
-            forward_migration = [{"drop": {"table_name": table_name}}]
-            backward_migration = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
+            forward_migration_list = [{"drop": {"table_name": table_name}}]
+            backward_migration_list = [{"create": {"table_name": table_name, "columns": columns, "types": types}}]
             
-            migration = Migration(forward=forward_migration, backward=backward_migration)
+            
         else:
             diff = DeepDiff(old_column_type_dict, new_column_type_dict, verbose_level=2)
-            migration = self._convert_deepdiff_dict_into_migration(table_name, diff)
+            forward_migration_list, backward_migration_list = _convert_deepdiff_dict_into_migration_lists(table_name, diff)
             
-        self._merge_migration_to_pending_migration(migration=migration)
+        #migration = Migration(forward=forward_migration_list, backward=backward_migration_list)
+            
+        self._append_migration_to_pending_migration(forward_migration_list, backward_migration_list)
 
-        return migration
+        return forward_migration_list, backward_migration_list
 
     
     
  
     
-    def _merge_migration_to_pending_migration(self, migration: Migration):
-        new_forward_part = self._pending_migration.forward + migration.forward
-        new_backward_part = self._pending_migration.backward + migration.backward
-        self._pending_migration = Migration(forward=new_forward_part, backward=new_backward_part)
+    def _append_migration_to_pending_migration(self, forward_migration_list, backward_migration_list):
+        self._pending_forward_migration_list += forward_migration_list
+        self._pending_backward_migration_list += backward_migration_list
+        
         
     def _clear_pending_migration(self):
-        self._pending_migration = Migration(forward=[], backward=[])
+        self._pending_forward_migration_list = []
+        self._pending_backward_migration_list = []
         
     # def _read_migration_history_json(self, file_path: str = MIGRATION_HISTORY_DEFAULT_PATH):
     #     if not file_path.endswith(".json"):
