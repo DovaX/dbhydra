@@ -113,7 +113,6 @@ class AbstractSelectable:
             return(self) #to enable chaining
         
         else:
-            print(query)
             self.db1.cursor.execute(query)
             
             columns_count=len(self._get_selected_columns(query))
@@ -171,7 +170,7 @@ class AbstractSelectable:
         where_query=where_query.replace("WHERE","AND")
         where_query=where_query.replace("AND","WHERE",1) #First WHERE is not replaced by AND
         query=" ".join([core_query,where_query])
-        print(query)
+        
         return(query)
     
     def _build_queries_from_blocks(self):
@@ -259,7 +258,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     
     def drop(self):
         query = "DROP TABLE " + self.name
-        print(query)
+        
         self.execute(query)
 
     def update(self, variable_assign, where=None):
@@ -267,7 +266,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             query = "UPDATE " + self.name + " SET " + variable_assign
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
-        print(query)
+        
         return self.execute(query)
 
     def update_from_df(
@@ -321,7 +320,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         else:
             sql_query += ";"
 
-        print(sql_query)
         self.execute(sql_query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
@@ -378,7 +376,6 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
             id_index=inserted_columns.index(self.id_column_name)
             inserted_columns.pop(id_index)
-            print(inserted_columns,df.columns)
             
             assert set(df.columns) == set(inserted_columns) #elements are matchin
             #df = df[inserted_columns]
