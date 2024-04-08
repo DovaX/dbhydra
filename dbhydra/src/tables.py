@@ -966,9 +966,8 @@ class XlsxTable(AbstractTable):
             except Exception:
                 # print(f"Error while reading data into XlsxTable: {e}")
                 # df = pd.DataFrame(columns=self.columns)
-                if attempt < self.NUMBER_OF_RETRIES:
+                if attempt < self.NUMBER_OF_RETRIES - 1:
                     time.sleep(0.1)
-                    continue
                 else:
                     print(f"Failed to read data from {self.table_directory_path}, returning empty DataFrame")
                     df = pd.DataFrame(columns=self.columns)
