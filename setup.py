@@ -19,7 +19,8 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     install_requires=[
-          'pyodbc','pandas','pymysql','pymongo','google-cloud-bigquery','pydantic'
+          'pyodbc','pandas','pymysql','pymongo','google-cloud-bigquery','pydantic', 'deepdiff', 'psycopg2-binary',
+          'uvicorn'
      ],
     python_requires='>=3.6',
 )
