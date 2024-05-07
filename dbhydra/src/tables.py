@@ -1,13 +1,12 @@
-import pandas as pd
-import numpy as np
-from typing import Optional, Any
-import abc
-import time
-#xlsx imports
 import pathlib
+import time
+from typing import Any, Optional
 
-from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
+import numpy as np
+import pandas as pd
+import pymysql
 
+from dbhydra.src.abstract_table import AbstractJoinable, AbstractSelectable, AbstractTable
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -749,9 +748,8 @@ class MysqlTable(AbstractTable):
         print(query)
         try:
             self.db1.execute(query)
-        except Exception as e:
-            print("Table " + self.name + " already exists:", e)
-            print("Check the specification of table columns and their types")
+        except pymysql.OperationalError as e:
+            raise Exception(e.args[1]) from e
 
     def insert(self, rows, batch=1, replace_apostrophes=True, try_mode=False, debug_mode=False, insert_id=False):
         start_index = 0 if insert_id else 1
