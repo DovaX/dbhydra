@@ -314,7 +314,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
                 raise AttributeError(f"Unknown column type '{column_type}'")
 
         column_value_string = column_value_string.rstrip(", ")
-        sql_query = f"UPDATE {self.name} SET {column_value_string}"
+        quote = self.db1.identifier_quote
+        sql_query = f"UPDATE {quote}{self.name}{quote} SET {column_value_string}"
 
         if where_column is not None and where_value is not None:
             sql_query += f" WHERE {where_column} = {where_value};"
