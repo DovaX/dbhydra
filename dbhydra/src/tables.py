@@ -730,9 +730,10 @@ class MysqlTable(AbstractTable):
 
         return num_of_records[0][0]
 
-    def drop(self):
+    def drop(self, debug_mode = False):
         query = "DROP TABLE `" + self.name + "`;"
-        print(query)
+        if debug_mode:
+            print(query)
         self.db1.execute(query)
 
     # @save_migration #TODO: Uncomment
