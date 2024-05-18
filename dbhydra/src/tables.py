@@ -141,7 +141,7 @@ class PostgresTable(AbstractTable):
         return (cls(db1, name, columns, types))
 
     # @save_migration
-    def create(self, foreign_keys=None):
+    def create(self, foreign_keys=None, debug_mode = False):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int" or self.types[0].lower() == "integer"
@@ -151,7 +151,8 @@ class PostgresTable(AbstractTable):
 
         query = query[:-1]
         query += ");"
-        print(query)
+        if debug_mode:
+            print(query)
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -495,7 +496,7 @@ class SqlServerTable(AbstractTable):
         types = information_schema_table.select(query)
         return (types)
 
-    def create(self):
+    def create(self, debug_mode = False):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
@@ -503,8 +504,8 @@ class SqlServerTable(AbstractTable):
         for i in range(1, len(self.columns)):
             query += self.columns[i] + " " + self.types[i] + ","
         query += "PRIMARY KEY("+self.id_column_name+"))"
-
-        print(query)
+        if debug_mode:
+            print(query)
         try:
             self.db1.execute(query)
         except Exception as e:
@@ -735,7 +736,7 @@ class MysqlTable(AbstractTable):
         self.db1.execute(query)
 
     # @save_migration #TODO: Uncomment
-    def create(self, foreign_keys=None):
+    def create(self, foreign_keys=None, debug_mode = False):
         assert len(self.columns) == len(self.types)
         assert self.columns[0] == self.id_column_name
         assert self.types[0].lower() == "int"
@@ -745,8 +746,8 @@ class MysqlTable(AbstractTable):
             [f"`{column}` {type_.upper()}" for column, type_ in column_type_pairs]
         )
         query = f"CREATE TABLE `{self.name}` ({self.id_column_name} INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, {fields})"
-
-        print(query)
+        if debug_mode:
+            print(query)
         try:
             self.db1.execute(query)
         except Exception as e:

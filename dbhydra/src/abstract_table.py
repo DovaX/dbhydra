@@ -258,21 +258,23 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         return cls(db1, name, columns, types, id_column_name=id_column_name)
     
     
-    def drop(self):
+    def drop(self, debug_mode = False):
         query = "DROP TABLE " + self.name
-        print(query)
+        if debug_mode:
+            print(query)
         self.execute(query)
 
-    def update(self, variable_assign, where=None):
+    def update(self, variable_assign, where=None, debug_mode = False):
         if where is None:
             query = "UPDATE " + self.name + " SET " + variable_assign
         else:
             query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
-        print(query)
+        if debug_mode:
+            print(query)
         return self.execute(query)
 
     def update_from_df(
-            self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None) -> None:
+            self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None, debug_mode = False) -> None:
         """Build UPDATE SQL query from a dataframe and execute it.
 
         :param update_df: Dataframe with updated values - MUST only hold a single row
@@ -322,8 +324,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             sql_query += f" WHERE {where_column} = {where_value};"
         else:
             sql_query += ";"
-
-        print(sql_query)
+        if debug_mode:
+            print(sql_query)
         self.execute(sql_query)
 
     def _adjust_df(self, df: pd.DataFrame, debug_mode=False) -> pd.DataFrame:
