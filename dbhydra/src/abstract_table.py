@@ -400,7 +400,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
         # TODO: handling nan values -> change to NULL
         for column in list(df.columns):
-            df.loc[pd.isna(df[column]), column] = "NULL"
+            
+            df[column] = df[column].fillna("NULL") #New implementation, Old implementation was deprecated by pandas: #df.loc[pd.isna(df[column]), column] = "NULL"
 
         # rows = df.values.tolist()
         # for i, row in enumerate(rows):

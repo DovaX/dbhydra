@@ -294,11 +294,12 @@ class BigQueryTable(AbstractSelectable):
         return column_names, column_types
 
 
-    def select(self, query):
+    def select(self, query, debug_mode = False):
 
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
-        print(query)
+        if debug_mode:
+            print(query)
         # rows =  self.db1.client.query(query).result()
         rows = self.db1.execute(query)
         return rows
