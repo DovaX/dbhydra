@@ -102,7 +102,7 @@ class AbstractSelectable:
         return (results)
 
 
-    def select(self, query, flattening_of_results=False):
+    def select(self, query, flattening_of_results=False, debug_mode = False):
         """given SELECT query returns Python list"""
         """Columns give the number of selected columns"""
         
@@ -113,7 +113,8 @@ class AbstractSelectable:
             return(self) #to enable chaining
         
         else:
-            print(query)
+            if debug_mode:
+                print(query)
             self.db1.cursor.execute(query)
             
             columns_count=len(self._get_selected_columns(query))
@@ -131,18 +132,18 @@ class AbstractSelectable:
             return(rows)
             
 
-    def select_all(self):
+    def select_all(self, debug_mode = False):
         quote = self.db1.identifier_quote
         all_cols_query = ""
         for col in self.columns:
             all_cols_query = all_cols_query + quote + col + quote + ","
         if all_cols_query[-1] == ",":
             all_cols_query = all_cols_query[:-1]
-        list1 = self.select(f"SELECT {all_cols_query} FROM {quote}{self.name}{quote};")
+        list1 = self.select(f"SELECT {all_cols_query} FROM {quote}{self.name}{quote};", debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self):
-        rows = self.select_all()
+    def select_to_df(self, debug_mode = False):
+        rows = self.select_all(debug_mode = debug_mode)
         if self.query_building_enabled:
             self.to_df()
             df=None
