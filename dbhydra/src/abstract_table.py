@@ -259,16 +259,19 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     
     
     def drop(self, debug_mode = False):
-        query = "DROP TABLE " + self.name
+        quote = self.db1.identifier_quote
+        query = f"DROP TABLE {quote}{self.name}{quote}"
         if debug_mode:
             print(query)
         self.execute(query)
 
     def update(self, variable_assign, where=None, debug_mode = False):
+        quote = self.db1.identifier_quote
         if where is None:
-            query = "UPDATE " + self.name + " SET " + variable_assign
+            query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote}"
         else:
-            query = "UPDATE " + self.name + " SET " + variable_assign + " WHERE " + where
+            query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote} WHERE {quote}{where}{quote}"
+
         if debug_mode:
             print(query)
         return self.execute(query)
@@ -303,25 +306,25 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             for column_name, column_type in types_without_id_column
         ]
 
+        quote = self.db1.identifier_quote
         column_value_string = ""
         for column_name, cell_value, column_type in update_df_row_list:
             if cell_value is None:
-                column_value_string += f"{column_name} = NULL, "
+                column_value_string += f"{quote}{column_name}{quote} = NULL, "
             elif column_type in ["double", "int", "tinyint"]:
-                column_value_string += f"{column_name} = {cell_value}, "
+                column_value_string += f"{quote}{column_name}{quote} = {cell_value}, "
             elif "varchar" in column_type:
-                column_value_string += f"{column_name} = '{cell_value}', "
+                column_value_string += f"{quote}{column_name}{quote} = '{cell_value}', "
             elif column_type in ["json", "text", "mediumtext", "longtext", "datetime"]:
-                column_value_string += f"{column_name} = '{cell_value}', "
+                column_value_string += f"{quote}{column_name}{quote} = '{cell_value}', "
             else:
                 raise AttributeError(f"Unknown column type '{column_type}'")
 
         column_value_string = column_value_string.rstrip(", ")
-        quote = self.db1.identifier_quote
         sql_query = f"UPDATE {quote}{self.name}{quote} SET {column_value_string}"
 
         if where_column is not None and where_value is not None:
-            sql_query += f" WHERE {where_column} = {where_value};"
+            sql_query += f" WHERE {quote}{where_column}{quote} = {where_value};"
         else:
             sql_query += ";"
         if debug_mode:
@@ -429,12 +432,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         quote = self.db1.identifier_quote
 
         if where is None:
-            query = "DELETE FROM {quote}{self.name}{quote}"
+            query = f"DELETE FROM {quote}{self.name}{quote}"
         else:
             query = f"DELETE FROM {quote}{self.name}{quote} WHERE {where}"
         return self.execute(query)
-
-
-
-
-    
