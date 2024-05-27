@@ -385,7 +385,7 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             inserted_columns=list(dict.fromkeys(self.columns)) #DEDUPLICATION preserving order -> better than inserted_columns = set(self.columns) 
             id_index=inserted_columns.index(self.id_column_name)
             inserted_columns.pop(id_index)
-            print(inserted_columns,df.columns)
+            # print(inserted_columns,df.columns)
             
             assert set(df.columns) == set(inserted_columns) #elements are matchin
             #df = df[inserted_columns]
