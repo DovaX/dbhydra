@@ -808,9 +808,8 @@ class MysqlTable(AbstractTable):
                 elif "json" in self.types[j + start_index]:
                     query += f"'{rows[k][j]}', "
                 elif 'blob' in self.types[j + start_index]:
-                    escaped_binary_data = pymysql.Binary(rows[k][j])
                     # Convert to hex to allow insertion into SQL query
-                    hex_data = binascii.hexlify(escaped_binary_data).decode('ascii')
+                    hex_data = binascii.hexlify(rows[k][j]).decode('ascii')
                     query += f"UNHEX('{hex_data}'), "
 
                 else:
