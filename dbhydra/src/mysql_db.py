@@ -19,7 +19,8 @@ class MysqlDb(AbstractDb):
     'dict': "nvarchar(2047)",
     'bool': "tinyint",
     'datetime': "datetime",
-    'Jsonable': "json"
+    'Jsonable': "json",
+    'BLOB': "mediumblob",
     }
 
     def __init__(self, *args, **kwargs):

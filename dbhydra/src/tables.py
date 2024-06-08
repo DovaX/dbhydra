@@ -5,9 +5,9 @@ import abc
 import time
 #xlsx imports
 import pathlib
-
+import pymysql
 from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
-
+import binascii
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -807,7 +807,10 @@ class MysqlTable(AbstractTable):
                     query += "'" + str(rows[k][j]) + "',"
                 elif "json" in self.types[j + start_index]:
                     query += f"'{rows[k][j]}', "
-
+                elif 'blob' in self.types[j + start_index]:
+                    # Convert to hex to allow insertion into SQL query
+                    hex_data = binascii.hexlify(rows[k][j]).decode('ascii')
+                    query += f"UNHEX('{hex_data}'), "
 
                 else:
                     query += str(rows[k][j]) + ","

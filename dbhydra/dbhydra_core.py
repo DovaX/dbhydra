@@ -22,6 +22,9 @@ class Jsonable(str):
     """Is used as type in python_database_type_mapping"""    
     pass
 
+class BLOB(str):
+    """Store BLOBS up to 16MB."""    
+    pass
 
 
 # dataframe - dictionary auxiliary functions
