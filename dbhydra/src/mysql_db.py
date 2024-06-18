@@ -20,7 +20,7 @@ class MysqlDb(AbstractDb):
     'bool': "tinyint",
     'datetime': "datetime",
     'Jsonable': "json",
-    'BLOB': "mediumblob",
+    'Blob': "mediumblob",
     }
 
     def __init__(self, *args, **kwargs):
