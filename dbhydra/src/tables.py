@@ -5,7 +5,6 @@ import abc
 import time
 #xlsx imports
 import pathlib
-import pymysql
 from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
 import binascii
 
@@ -906,6 +905,11 @@ class XlsxTable(AbstractTable):
         self.table_directory_path: pathlib.Path = self.db1.db_directory_path / table_filename
 
     def _save_table(self, df: pd.DataFrame):
+        blob_columns = [
+            column for column, type_ in self.column_type_dict.items() if type_ == "Blob"
+        ]
+        df[blob_columns] = df[blob_columns].map(lambda x: x.hex() if x is not None else None)
+
         if self.db1.is_csv:
             df.to_csv(self.table_directory_path, index=False)
         else:
@@ -963,6 +967,9 @@ class XlsxTable(AbstractTable):
         date_columns = [
             column for column, type_ in self.column_type_dict.items() if type_ == "datetime"
         ]
+        blob_columns = [
+            column for column, type_ in self.column_type_dict.items() if type_ == "Blob"
+        ]
 
         # BUG: If XlsxTable is being accessed by multiple threads, read operation
         # might fail due to race conditions. Add retry mechanism to handle these cases.
@@ -977,6 +984,8 @@ class XlsxTable(AbstractTable):
                 else:
                     print(f"Failed to read data from {self.table_directory_path}, returning empty DataFrame")
                     df = pd.DataFrame(columns=self.columns)
+
+        df[blob_columns] = df[blob_columns].map(lambda x: bytes.fromhex(x) if x else None)
         return df
 
     def _select(self, column_type_map, date_columns):

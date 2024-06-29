@@ -58,6 +58,7 @@ class AbstractDb(abc.ABC):
         'Union': 'object',
         'Optional': 'object',
         'Jsonable': 'Jsonable',
+        'Blob': 'Blob',
         # 'FrozenSet': frozenset,
         # 'Deque': list,
         # 'Any': object,
