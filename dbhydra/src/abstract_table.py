@@ -1,3 +1,4 @@
+import binascii
 import pandas as pd
 from typing import Optional, Any
 import numpy as np
@@ -317,6 +318,10 @@ class AbstractTable(AbstractJoinable, abc.ABC):
                 column_value_string += f"{quote}{column_name}{quote} = '{cell_value}', "
             elif column_type in ["json", "text", "mediumtext", "longtext", "datetime"]:
                 column_value_string += f"{quote}{column_name}{quote} = '{cell_value}', "
+            elif 'blob' in column_type:
+                # Convert to hex to allow insertion into SQL query
+                hex_data = binascii.hexlify(cell_value).decode('ascii')
+                column_value_string += f"{quote}{column_name}{quote} = UNHEX('{hex_data}'), "
             else:
                 raise AttributeError(f"Unknown column type '{column_type}'")
 
