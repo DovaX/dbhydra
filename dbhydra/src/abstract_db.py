@@ -201,8 +201,12 @@ class AbstractDb(abc.ABC):
         return(result)
 
     def close_connection(self):
-        self.connection.close()
-        print("DB connection closed")
+        try:
+            self.connection.close()
+            print("DB connection closed")
+        except AttributeError as e:
+            raise Exception("DbHydra Error: The connection couldn't be closed, are you sure the connection string to DB is configured correctly? Error message:"+str(e))
+            
 
     def initialize_migrator(self):
         self.migrator = Migrator(self)
