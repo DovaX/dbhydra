@@ -2,7 +2,7 @@ import abc
 import threading
 from contextlib import contextmanager
 from typing import Optional
-
+import time
 from dbhydra.src.migrator import Migrator
 from dbhydra.src.tables import AbstractTable
 
@@ -73,7 +73,7 @@ class AbstractDb(abc.ABC):
         # 'AbstractSet': set,
     }
     python_database_type_mapping = {}
-    def __init__(self, config_file="config.ini", db_details=None):
+    def __init__(self, config_file="config.ini", db_details=None, debug_mode=False):
         if db_details is None:
             db_details = read_connection_details(config_file)
 
@@ -87,6 +87,7 @@ class AbstractDb(abc.ABC):
         self.DB_PASSWORD = db_details["DB_PASSWORD"]
         
         self.is_autocommiting=True
+        self.debug_mode = debug_mode
 
         if "DB_PORT" in db_details.keys():
             self.DB_PORT = int(db_details["DB_PORT"])
@@ -153,9 +154,15 @@ class AbstractDb(abc.ABC):
     @contextmanager
     def connect_to_db(self):
         try:
+            if self.debug_mode:
+                with open("dbhydra_logs.txt","a+") as file:
+                    file.write(str(time.now())+": DB "+str(self)+": _connect() called")
             self._connect()
             yield None
         finally:
+            if self.debug_mode:
+                with open("dbhydra_logs.txt","a+") as file:
+                    file.write(str(time.now())+": DB "+str(self)+": close_connection() called")
             self.close_connection()
 
     @contextmanager
@@ -188,6 +195,9 @@ class AbstractDb(abc.ABC):
         result=self.cursor.execute(query)
         if self.is_autocommitting:
             self.cursor.commit()
+            if self.debug_mode:
+                with open("dbhydra_logs.txt","a+") as file:
+                    file.write(str(time.now())+": DB "+str(self)+": execute() called with query: "+str(query))
         return(result)
 
     def close_connection(self):

@@ -1,6 +1,6 @@
 
 
-
+import time
 import pymysql
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import MysqlTable
@@ -55,6 +55,9 @@ class MysqlDb(AbstractDb):
         result=self.cursor.execute(query)
         if is_autocommitting:
             self.connection.commit()
+            if self.debug_mode:
+                with open("dbhydra_logs.txt","a+") as file:
+                    file.write(str(time.now())+": DB "+str(self)+": execute() called with query: "+str(query))
         return result
     
 
