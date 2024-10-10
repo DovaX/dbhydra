@@ -57,7 +57,7 @@ class MysqlDb(AbstractDb):
             self.connection.commit()
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called\n")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called, debug msg:"+str(self.debug_message)+"\n")
                 with open("dbhydra_queries_logs.txt","a+") as file:
                     file.write(str(datetime.datetime.now())+": "+str(query)+"\n")
         return result

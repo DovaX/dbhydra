@@ -73,7 +73,7 @@ class AbstractDb(abc.ABC):
         # 'AbstractSet': set,
     }
     python_database_type_mapping = {}
-    def __init__(self, config_file="config.ini", db_details=None, debug_mode=False):
+    def __init__(self, config_file="config.ini", db_details=None, debug_mode=False, debug_message=""):
         if db_details is None:
             db_details = read_connection_details(config_file)
 
@@ -88,6 +88,7 @@ class AbstractDb(abc.ABC):
         
         self.is_autocommiting=True
         self.debug_mode = debug_mode
+        self.debug_message = debug_message
 
         if "DB_PORT" in db_details.keys():
             self.DB_PORT = int(db_details["DB_PORT"])
@@ -156,13 +157,13 @@ class AbstractDb(abc.ABC):
         try:
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": _connect() called\n")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": _connect() called, debug msg:"+str(self.debug_message)+"\n")
             self._connect()
             yield None
         finally:
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": close_connection() called\n")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": close_connection() called, debug msg:"+str(self.debug_message)+"\n")
             self.close_connection()
 
     @contextmanager
@@ -197,7 +198,7 @@ class AbstractDb(abc.ABC):
             self.cursor.commit()
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called\n")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called, debug msg:"+str(self.debug_message)+"\n")
                 with open("dbhydra_queries_logs.txt","a+") as file:
                     file.write(str(datetime.datetime.now())+": "+str(query)+"\n")
         return(result)
