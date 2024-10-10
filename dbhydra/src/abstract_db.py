@@ -2,7 +2,7 @@ import abc
 import threading
 from contextlib import contextmanager
 from typing import Optional
-import time
+import datetime
 from dbhydra.src.migrator import Migrator
 from dbhydra.src.tables import AbstractTable
 
@@ -156,13 +156,13 @@ class AbstractDb(abc.ABC):
         try:
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(time.now())+": DB "+str(self)+": _connect() called")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": _connect() called")
             self._connect()
             yield None
         finally:
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(time.now())+": DB "+str(self)+": close_connection() called")
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": close_connection() called")
             self.close_connection()
 
     @contextmanager
@@ -197,7 +197,7 @@ class AbstractDb(abc.ABC):
             self.cursor.commit()
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(time.now())+": DB "+str(self)+": execute() called with query: "+str(query))
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called with query: "+str(query))
         return(result)
 
     def close_connection(self):

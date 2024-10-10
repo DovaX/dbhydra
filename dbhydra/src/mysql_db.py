@@ -1,6 +1,6 @@
 
 
-import time
+import datetime
 import pymysql
 from dbhydra.src.abstract_db import AbstractDb
 from dbhydra.src.tables import MysqlTable
@@ -57,7 +57,7 @@ class MysqlDb(AbstractDb):
             self.connection.commit()
             if self.debug_mode:
                 with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(time.now())+": DB "+str(self)+": execute() called with query: "+str(query))
+                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called with query: "+str(query))
         return result
     
 
