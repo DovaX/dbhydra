@@ -809,7 +809,7 @@ class MysqlTable(AbstractTable):
                 elif 'blob' in self.types[j + start_index]:
                     # Convert to hex to allow insertion into SQL query
                     hex_data = binascii.hexlify(rows[k][j]).decode('ascii')
-                    query += f"UNHEX('{hex_data}'), "
+                    query += f"UNHEX('{hex_data}'),"
 
                 else:
                     query += str(rows[k][j]) + ","
