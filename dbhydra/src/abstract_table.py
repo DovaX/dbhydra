@@ -424,14 +424,26 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
     #TODO: need to solve inserting in different column_order
     #check df column names, permute if needed
-    def insert_from_column_value_dict(self, dict, insert_id=False):
-        df = pd.DataFrame(dict, index=[0])
+    def insert_from_column_value_dict(self, inserted_dict, insert_id=False):
+        print("DbHydra deprecation warning! insert_from_column_value_dict method was renamed to insert_from_dict and will be deprecated.")
+        self.insert_from_dict(inserted_dict, insert_id)
+        
+    def insert_from_column_value_dict_list(self, inserted_list, insert_id=False):
+        print("DbHydra deprecation warning! insert_from_column_value_dict_list method was renamed to insert_from_dict_list and will be deprecated.")
+        self.insert_from_dict(inserted_list, insert_id)
+        
+    def insert_from_dict(self, column_value_dict, insert_id = False):
+        df = pd.DataFrame(column_value_dict, index=[0])
         return self.insert_from_df(df, insert_id=insert_id)
 
-    def insert_from_column_value_dict_list(self, list, insert_id=False):
-        df = pd.DataFrame(list)
-        self.insert_from_df(df, insert_id=insert_id)
-
+    def insert_from_dict_list(self, column_value_dict_list, insert_id = False):
+        df = pd.DataFrame(column_value_dict_list)
+        return self.insert_from_df(df, insert_id=insert_id)
+        
+    def update_from_dict(self, column_value_dict, where_column: Optional[str] = None, where_value: Any = None):
+        update_df = pd.DataFrame(column_value_dict, index=[0])
+        self.update_from_df(update_df, where_column, where_value)
+            
 
     def delete(self, where=None):
         quote = self.db1.identifier_quote
