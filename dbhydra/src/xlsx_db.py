@@ -18,6 +18,7 @@ class XlsxDb(AbstractDb):
     def __init__(self, config_file="config.ini", db_details=None, is_csv=False):
         self.locally=True
         self.is_csv = is_csv
+        self.debug_mode = False #Defined because of AbstractDb method calls
         if db_details is None:
             self.name="new_db"
             self.db_directory_path = None
