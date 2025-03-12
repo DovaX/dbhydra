@@ -78,9 +78,10 @@ class AbstractSelectable:
             columns = self.columns
         elif column_string.find(",") == -1:
             assert column_string.count("select")<=1 #assume there are no table columns containing "select" substring
-            columns = [column_string.replace("select","").strip()]
+            columns = [column_string.replace("select","").replace(self.db1.identifier_quote,"").strip()]
         else:
-            columns = [x.strip() for x in column_string.split(",")]
+            assert column_string.count("select")<=1
+            columns = [x.replace("select","").replace(self.db1.identifier_quote,"").strip() for x in column_string.split(",")]
         return(columns)
 
 
@@ -208,7 +209,7 @@ class AbstractSelectable:
             queries, queries_destinations=self._build_queries_from_blocks()
             self._query_blocks=[]
             for i,query in enumerate(queries):
-                self.db1.execute()
+                self.db1.execute(query)
                 
                 if "SELECT" in query:
                     selected_columns=self._get_selected_columns(query)
