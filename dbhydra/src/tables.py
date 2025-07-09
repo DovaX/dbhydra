@@ -38,7 +38,6 @@ PYTHON_TO_MYSQL_DATA_MAPPING = {
 
 def save_migration(function, *args, **kw):  # decorator
     def new_function(instance, *args, **kw):
-        print("TOTO TU")
         print(instance)
         print(*args)
         command = function.__name__
@@ -63,9 +62,12 @@ def save_migration(function, *args, **kw):  # decorator
             print(migration_dict)
         # TODO: add other methods
 
-        migrator = instance.db1.migrator
-        migrator.migration_list.append(migration_dict)
-        # migrator.migration_list_to_json()
+        if hasattr(instance.db1, 'migrator'):
+            migrator = instance.db1.migrator
+            migrator.migration_list.append(migration_dict)
+            # migrator.migration_list_to_json()
+        else:
+            print(f"[save_migration] WARNING: db1 object of type {type(instance.db1)} has no 'migrator' attribute. Migration not saved.")
         function(instance, *args, **kw)
 
     return (new_function)
