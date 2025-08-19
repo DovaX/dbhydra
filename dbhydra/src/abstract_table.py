@@ -269,10 +269,17 @@ class AbstractTable(AbstractJoinable, abc.ABC):
 
     def update(self, variable_assign, where=None, debug_mode = False):
         quote = self.db1.identifier_quote
-        if where is None:
-            query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote}"
-        else:
-            query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote} WHERE {quote}{where}{quote}"
+
+        query = f"UPDATE {quote}{self.name}{quote} SET {variable_assign}"
+        
+        if where:
+            query += f" WHERE {where}"
+
+        #Old broken implementation it gives `` for the SQL syntax query
+        # if where is None:
+        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote}"
+        # else:
+        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote} WHERE {quote}{where}{quote}"
 
         if debug_mode:
             print(query)
