@@ -27,6 +27,11 @@ class Blob(str):
     pass
 
 
+class LongText(str):
+    """Marker type for columns that should be mapped to LONGTEXT in SQL backends."""
+    pass
+
+
 # dataframe - dictionary auxiliary functions
 def df_to_dict(df, column1, column2):
     dictionary = df.set_index(column1).to_dict()[column2]

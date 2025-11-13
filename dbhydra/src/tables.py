@@ -808,6 +808,11 @@ class MysqlTable(AbstractTable):
                     query += "'" + str(rows[k][j]) + "',"
                 elif "json" in self.types[j + start_index]:
                     query += f"'{rows[k][j]}', "
+                elif "text" in self.types[j + start_index]:
+                    # Covers text, mediumtext, longtext
+                    if replace_apostrophes:
+                        rows[k][j] = str(rows[k][j]).replace("'", "")
+                    query += "'" + str(rows[k][j]) + "',"
                 elif 'blob' in self.types[j + start_index]:
                     # Convert to hex to allow insertion into SQL query
                     hex_data = binascii.hexlify(rows[k][j]).decode('ascii')
