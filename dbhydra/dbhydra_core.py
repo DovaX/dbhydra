@@ -26,6 +26,10 @@ class Blob(str):
     """Store BLOBs up to 16MB."""    
     pass
 
+class LongText(str):
+    """Store long text strings (maps to MySQL LONGTEXT)."""    
+    pass
+
 
 # dataframe - dictionary auxiliary functions
 def df_to_dict(df, column1, column2):

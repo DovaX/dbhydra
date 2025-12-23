@@ -21,6 +21,7 @@ class MysqlDb(AbstractDb):
     'datetime': "datetime",
     'Jsonable': "json",
     'Blob': "mediumblob",
+    'LongText': "longtext",
     }
 
     def __init__(self, *args, **kwargs):
