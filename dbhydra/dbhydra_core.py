@@ -26,6 +26,10 @@ class Blob(str):
     """Store BLOBs up to 16MB."""    
     pass
 
+class LongText(str):
+    """Store long text strings (maps to MySQL LONGTEXT)."""    
+    pass
+
 
 class LongText(str):
     """Marker type for columns that should be mapped to LONGTEXT in SQL backends."""
