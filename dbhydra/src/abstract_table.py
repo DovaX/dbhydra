@@ -134,18 +134,32 @@ class AbstractSelectable:
             return(rows)
             
 
-    def select_all(self, debug_mode = False):
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None):
         quote = self.db1.identifier_quote
         all_cols_query = ""
         for col in self.columns:
             all_cols_query = all_cols_query + quote + col + quote + ","
         if all_cols_query[-1] == ",":
             all_cols_query = all_cols_query[:-1]
-        list1 = self.select(f"SELECT {all_cols_query} FROM {quote}{self.name}{quote};", debug_mode = debug_mode)
+        
+        query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
+        
+        # Add LIMIT and OFFSET to the query
+        if limit is not None and limit > 0:
+            if offset is not None and offset > 0:
+                query += f" LIMIT {offset}, {limit}"
+            else:
+                query += f" LIMIT {limit}"
+        elif offset is not None and offset > 0:
+            # MySQL requires LIMIT when using OFFSET, use a large number for all remaining rows
+            query += f" LIMIT {offset}, 18446744073709551615"
+        
+        query += ";"
+        list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False):
-        rows = self.select_all(debug_mode = debug_mode)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset)
         if self.query_building_enabled:
             self.to_df()
             df=None
