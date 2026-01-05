@@ -43,7 +43,8 @@ class XlsxDb(AbstractDb):
         'bool': "bool",
         'datetime': "datetime",
         'Jsonable': "str",
-        'Blob': "Blob"
+        'Blob': "Blob",
+        'LongText': "str"
         }
 
         

@@ -284,10 +284,14 @@ class AbstractTable(AbstractJoinable, abc.ABC):
     def update(self, variable_assign, where=None, debug_mode = False):
         quote = self.db1.identifier_quote
 
-        assert "=" in variable_assign 
-        assigned_variable,assigned_value=variable_assign.split("=").strip()
+        if "=" not in variable_assign:
+            raise ValueError("Missing '=' in update statement")
+        # Expect a string like "column = value"; strip whitespace around both parts
+        assigned_variable, assigned_value = [
+            part.strip() for part in variable_assign.split("=", 1)
+        ]
         
-        query = f"UPDATE {quote}{self.name}{quote} SET {quote}{assigned_variable}{quote} = {assigned_value}"
+        query = f"UPDATE {self.name} SET {assigned_variable} = {assigned_value}"
         
         if where:
             query += f" WHERE {where}"
