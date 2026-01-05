@@ -277,10 +277,23 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             part.strip() for part in variable_assign.split("=", 1)
         ]
         
-        query = f"UPDATE {self.name} SET {assigned_variable} = {assigned_value}"
+        # Strip existing quotes from column name if present (handler may already quote it)
+        if assigned_variable.startswith(quote) and assigned_variable.endswith(quote):
+            assigned_variable = assigned_variable[len(quote):-len(quote)]
+        
+        query = f"UPDATE {quote}{self.name}{quote} SET {quote}{assigned_variable}{quote} = {assigned_value}"
         
         if where:
-            query += f" WHERE {where}"
+            # Parse WHERE clause to quote column name if it's in "column = value" format
+            if "=" in where:
+                where_column, where_value = [part.strip() for part in where.split("=", 1)]
+                # Strip existing quotes from column name if present (handler may already quote it)
+                if where_column.startswith(quote) and where_column.endswith(quote):
+                    where_column = where_column[len(quote):-len(quote)]
+                query += f" WHERE {quote}{where_column}{quote} = {where_value}"
+            else:
+                # For complex WHERE clauses, assume proper formatting is already provided
+                query += f" WHERE {where}"
 
         #Old broken implementation it gives `` for the SQL syntax query
         # if where is None:
