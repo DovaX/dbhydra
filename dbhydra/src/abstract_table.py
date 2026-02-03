@@ -134,7 +134,7 @@ class AbstractSelectable:
             return(rows)
             
 
-    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None):
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None):
         quote = self.db1.identifier_quote
         all_cols_query = ""
         for col in self.columns:
@@ -143,6 +143,9 @@ class AbstractSelectable:
             all_cols_query = all_cols_query[:-1]
         
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
+        
+        if where:
+            query+=" WHERE "+where
         
         # Add LIMIT and OFFSET to the query
         if limit is not None and limit > 0:
@@ -158,8 +161,8 @@ class AbstractSelectable:
         list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None):
-        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where)
         if self.query_building_enabled:
             self.to_df()
             df=None
