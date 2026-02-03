@@ -145,7 +145,14 @@ class AbstractSelectable:
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
         
         if where:
-            query+=" WHERE "+where
+            found_where_operator = None
+            for where_operator in [">=", "<=", ">", "<", "=", "LIKE", "IN"]:
+                if where_operator in where:
+                    found_where_operator = where_operator
+            where_column = where.split(found_where_operator)[0].strip()
+            where_value = where.split(found_where_operator)[1].strip()
+            assert found_where_operator is not None
+            query+=f" WHERE {quote}{where_column}{quote}{found_where_operator}{where_value}"
         
         # Add LIMIT and OFFSET to the query
         if limit is not None and limit > 0:
