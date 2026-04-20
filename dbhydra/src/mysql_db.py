@@ -52,17 +52,43 @@ class MysqlDb(AbstractDb):
         self.execute(create_db_command)
 
         
-    def execute(self, query, is_autocommitting=True):
-        result=self.cursor.execute(query)
+    def _execute_impl(self, query, params=None, is_autocommitting=True):
+        """Shared commit + debug logging for ``execute`` / ``execute_params`` (PyMySQL)."""
+        if params is None:
+            result = self.cursor.execute(query)
+        else:
+            result = self.cursor.execute(query, params)
         if is_autocommitting:
             self.connection.commit()
             if self.debug_mode:
-                with open("dbhydra_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": DB "+str(self)+": execute() called, debug msg:"+str(self.debug_message)+"\n")
-                with open("dbhydra_queries_logs.txt","a+") as file:
-                    file.write(str(datetime.datetime.now())+": "+str(query)+"\n")
+                with open("dbhydra_logs.txt", "a+") as file:
+                    file.write(
+                        str(datetime.datetime.now())
+                        + ": DB "
+                        + str(self)
+                        + ": execute() called, debug msg:"
+                        + str(self.debug_message)
+                        + "\n"
+                    )
+                with open("dbhydra_queries_logs.txt", "a+") as file:
+                    log_line = str(datetime.datetime.now()) + ": " + str(query)
+                    if params is not None:
+                        log_line += " | " + str(params)
+                    log_line += "\n"
+                    file.write(log_line)
         return result
-    
+
+    def execute(self, query, is_autocommitting=True):
+        return self._execute_impl(query, None, is_autocommitting)
+
+    def execute_params(self, query, params, is_autocommitting=True):
+        """Parameterized execute; PyMySQL uses ``%s`` placeholders (PEP-249). Delegates to same path as ``execute``."""
+        return self._execute_impl(query, params, is_autocommitting)
+
+    def set_foreign_key_checks(self, enabled: bool, is_autocommitting: bool = True):
+        """Run ``SET FOREIGN_KEY_CHECKS`` to 1 (enforce) or 0 (ignore) for the session."""
+        val = 1 if enabled else 0
+        return self.execute("SET FOREIGN_KEY_CHECKS = " + str(val) + ";", is_autocommitting=is_autocommitting)
 
     def get_all_tables(self):
         sysobjects_table = MysqlTable(self, "information_schema.tables", ["TABLE_NAME"], ["nvarchar(100)"])

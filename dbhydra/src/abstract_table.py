@@ -277,12 +277,8 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             part.strip() for part in variable_assign.split("=", 1)
         ]
         
-        # Strip existing quotes from column name if present (handler may already quote it)
-        if assigned_variable.startswith(quote) and assigned_variable.endswith(quote):
-            assigned_variable = assigned_variable[len(quote):-len(quote)]
-        
         query = f"UPDATE {quote}{self.name}{quote} SET {quote}{assigned_variable}{quote} = {assigned_value}"
-        
+  
         if where:
             # Parse WHERE clause to quote column name if it's in "column = value" format
             if "=" in where:

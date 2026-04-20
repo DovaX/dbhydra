@@ -1,12 +1,21 @@
+import re
+
 import pandas as pd
 import numpy as np
-from typing import Optional, Any
+from typing import Any, List, Optional
 import abc
 import time
 #xlsx imports
 import pathlib
 from dbhydra.src.abstract_table import AbstractTable, AbstractSelectable, AbstractJoinable
 import binascii
+
+_MYSQL_TEST_IDENT = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def _mysql_test_ident_ok(name: str) -> bool:
+    return bool(_MYSQL_TEST_IDENT.match(name))
+
 
 MONGO_OPERATOR_DICT = {"=": "$eq", ">": "$gt", ">=": "$gte", " IN ": "$in", "<": "$lt", "<=": "$lte", "<>": "$ne"}
 
@@ -737,6 +746,95 @@ class MysqlTable(AbstractTable):
         if debug_mode:
             print(query)
         self.db1.execute(query)
+
+    def drop_if_exists(self, database=None, debug_mode=False):
+        """Same identifier style as ``drop``, with ``IF EXISTS`` and optional ``database`.`table`` qualifier."""
+        db_name = database if database is not None else self.db1.DB_DATABASE
+        query = "DROP TABLE IF EXISTS `" + db_name + "`.`" + self.name + "`;"
+        if debug_mode:
+            print(query)
+        self.db1.execute(query)
+
+    def truncate(self, disable_foreign_key_checks=True, debug_mode=False):
+        """``TRUNCATE TABLE`` (same quoting as ``drop``). Optionally toggles FK checks via ``MysqlDb.set_foreign_key_checks``."""
+        query = "TRUNCATE TABLE `" + self.name + "`;"
+        if debug_mode:
+            print(query)
+        if disable_foreign_key_checks:
+            self.db1.set_foreign_key_checks(False)
+            try:
+                self.db1.execute(query)
+            finally:
+                self.db1.set_foreign_key_checks(True)
+        else:
+            self.db1.execute(query)
+
+    def insert_many_params(self, columns, rows, debug_mode=False):
+        """Bulk INSERT using ``%s`` placeholders; column/table quoting matches ``insert``."""
+        if not columns:
+            raise ValueError("insert_many_params requires non-empty columns")
+        if not rows:
+            return None
+        query = "INSERT INTO `" + self.name + "` ("
+        for c in columns:
+            column_name = "`" + c + "`"
+            query += column_name + ","
+        if query[-1] == ",":
+            query = query[:-1]
+        query = query + ") VALUES "
+        one_row = "(" + ",".join(["%s"] * len(columns)) + ")"
+        values_sql = ",".join(one_row for _ in rows)
+        query = query + values_sql
+        flat = tuple(v for row in rows for v in row)
+        if debug_mode:
+            print(query, flat)
+        return self.db1.execute_params(query, flat)
+
+    def get_column_metadata_list(self, database=None):
+        """
+        Column names and display types from ``information_schema.COLUMNS`` (parameterized).
+        ``database`` defaults to the connection's ``DB_DATABASE``.
+        """
+        schema = database if database is not None else self.db1.DB_DATABASE
+        if not _mysql_test_ident_ok(schema) or not _mysql_test_ident_ok(self.name):
+            raise ValueError("Invalid database or table_name for metadata query")
+        sql = (
+            "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s ORDER BY ORDINAL_POSITION"
+        )
+        self.db1.execute_params(sql, (schema, self.name))
+        rows = self.db1.cursor.fetchall()
+        return [{"column": r[0], "type": (r[2] or r[1])} for r in rows]
+
+    def select_columns_as_dicts(self, columns, order_by=None):
+        """
+        ``SELECT`` given columns from this table, ``ORDER BY`` one column; returns list of row dicts.
+        Identifiers must match ``[a-zA-Z0-9_-]+`` (same rule as test helpers).
+        """
+        if not columns:
+            raise ValueError("columns must be non-empty")
+        for c in columns:
+            if not _mysql_test_ident_ok(c):
+                raise ValueError("Invalid column name: %s" % (c,))
+        ord_col = order_by if order_by is not None else columns[0]
+        if not _mysql_test_ident_ok(ord_col):
+            raise ValueError("Invalid order_by column")
+        if not _mysql_test_ident_ok(self.name):
+            raise ValueError("Invalid table name")
+        cols_sql = ",".join("`" + c + "`" for c in columns)
+        sql = "SELECT %s FROM `%s` ORDER BY `%s` ASC" % (cols_sql, self.name, ord_col)
+        self.db1.execute(sql)
+        raw_rows = self.db1.cursor.fetchall()
+        out: List[dict] = []
+        for row in raw_rows:
+            row_dict: dict = {}
+            for i, col in enumerate(columns):
+                v = row[i]
+                if hasattr(v, "isoformat"):
+                    v = v.isoformat()
+                row_dict[col] = v
+            out.append(row_dict)
+        return out
 
     # @save_migration #TODO: Uncomment
     def create(self, foreign_keys=None, debug_mode = False):
