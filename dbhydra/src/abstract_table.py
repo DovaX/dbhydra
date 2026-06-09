@@ -74,15 +74,25 @@ class AbstractSelectable:
         else:
             column_string = "from".join(query.lower().split("from")[0:(from_keyword_count)])
         #print("column string",column_string)
+        quote = self.db1.identifier_quote
+
+        def _strip_leading_select(part: str) -> str:
+            part = part.strip()
+            if part.startswith("select"):
+                return part[6:].lstrip()
+            return part
+
         if "*" in column_string:
             columns = self.columns
         elif column_string.find(",") == -1:
-            assert column_string.count("select")<=1 #assume there are no table columns containing "select" substring
-            columns = [column_string.replace("select","").replace(self.db1.identifier_quote,"").strip()]
+            col_part = _strip_leading_select(column_string)
+            columns = [col_part.replace(quote, "").strip()]
         else:
-            assert column_string.count("select")<=1
-            columns = [x.replace("select","").replace(self.db1.identifier_quote,"").strip() for x in column_string.split(",")]
-        return(columns)
+            col_part = _strip_leading_select(column_string)
+            columns = [
+                x.replace(quote, "").strip() for x in col_part.split(",")
+            ]
+        return columns
 
 
     def _fetch_results(self, columns_count):
