@@ -77,11 +77,11 @@ class AbstractSelectable:
         if "*" in column_string:
             columns = self.columns
         elif column_string.find(",") == -1:
-            assert column_string.count("select")<=1 #assume there are no table columns containing "select" substring
-            columns = [column_string.replace("select","").replace(self.db1.identifier_quote,"").strip()]
+            assert column_string.count("select ")<=1 #assume there are no table columns containing "select" substring
+            columns = [column_string.replace("select ","").replace(self.db1.identifier_quote,"").strip()]
         else:
-            assert column_string.count("select")<=1
-            columns = [x.replace("select","").replace(self.db1.identifier_quote,"").strip() for x in column_string.split(",")]
+            assert column_string.count("select ")<=1
+            columns = [x.replace("select ","").replace(self.db1.identifier_quote,"").strip() for x in column_string.split(",")]
         return(columns)
 
 
