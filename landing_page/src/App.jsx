@@ -1,5 +1,5 @@
 import './App.css'
-import HydraLogo from './components/HydraLogo.jsx'
+import DocsSection from './components/DocsSection.jsx'
 import InstallCommand from './components/InstallCommand.jsx'
 
 const FEATURES = [
@@ -35,15 +35,6 @@ const FEATURES = [
   },
 ]
 
-const DATABASES = [
-  'MySQL / MariaDB',
-  'SQL Server',
-  'PostgreSQL',
-  'MongoDB',
-  'BigQuery',
-  'Xlsx DB',
-]
-
 const CODE_EXAMPLE = `import dbhydra.dbhydra_core as dh
 
 db1 = dh.MysqlDb("config-mysql.ini")
@@ -70,12 +61,18 @@ function App() {
 
       <header className="header">
         <a className="logo" href="#top">
-          <HydraLogo className="logo__icon" size={36} />
+          <img
+            className="logo__icon"
+            src="/dbhydra-logo.png"
+            alt=""
+            width={32}
+            height={32}
+          />
           dbhydra
         </a>
         <nav className="nav">
           <a href="#features">Features</a>
-          <a href="#databases">Databases</a>
+          <a href="#docs">Docs</a>
           <a href="#example">Example</a>
           <a href="#install">Install</a>
         </nav>
@@ -177,22 +174,7 @@ function App() {
           </div>
         </section>
 
-        <section className="section section--split" id="databases">
-          <div>
-            <p className="eyebrow">Supported backends</p>
-            <h2>One library, many engines</h2>
-            <p className="section__lead">
-              Switch databases by changing the db class and config — your table
-              operations stay the same. Ideal for prototypes, internal tools, and
-              data pipelines that outgrow a single store.
-            </p>
-          </div>
-          <ul className="database-list">
-            {DATABASES.map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        </section>
+        <DocsSection />
 
         <section className="section" id="example">
           <div className="section__header">

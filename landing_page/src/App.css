@@ -53,6 +53,10 @@ main,
 }
 
 .logo__icon {
+  display: block;
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -436,6 +440,233 @@ code {
   gap: 1.25rem;
 }
 
+.docs__layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.docs__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.docs__nav-item {
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.docs__nav-item--active {
+  border-color: rgba(61, 214, 198, 0.45);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.docs__panel {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(17, 31, 46, 0.95), rgba(8, 19, 29, 0.95));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.docs__panel h3 {
+  margin: 0 0 1.25rem;
+  font-size: 1.5rem;
+}
+
+.docs__text {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.docs__block {
+  margin-bottom: 1.25rem;
+}
+
+.docs__block h4 {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.docs__list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+}
+
+.docs__list li + li {
+  margin-top: 0.45rem;
+}
+
+.docs__code-label {
+  margin: 0 0 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.matrix-wrap {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.matrix-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.matrix-legend__item {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.matrix-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.matrix {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.matrix th,
+.matrix td {
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.matrix thead th {
+  background: rgba(255, 255, 255, 0.03);
+  font-weight: 600;
+}
+
+.matrix__feature-col {
+  text-align: left;
+  min-width: 11rem;
+  position: sticky;
+  left: 0;
+  background: rgba(8, 19, 29, 0.98);
+  z-index: 1;
+}
+
+.matrix__dialect-name {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.matrix__dialect-class {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+
+.matrix__feature-note {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+
+.matrix__badge {
+  display: inline-block;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status--full .matrix__badge,
+.status--full.matrix-legend__item {
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+}
+
+.status--partial .matrix__badge,
+.status--partial.matrix-legend__item {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fcd34d;
+}
+
+.status--wip .matrix__badge,
+.status--wip.matrix-legend__item {
+  background: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
+}
+
+.status--none .matrix__badge,
+.status--none.matrix-legend__item {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+.dialect-cards {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.dialect-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dialect-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.dialect-card h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.dialect-card__maturity {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dialect-card p {
+  margin: 0 0 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.dialect-card code {
+  font-size: 0.72rem;
+  color: #9ecfe0;
+}
+
 @media (min-width: 768px) {
   .nav {
     display: flex;
@@ -453,5 +684,21 @@ code {
 
   .install__steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .docs__layout {
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+  }
+
+  .docs__nav {
+    flex-direction: column;
+    position: sticky;
+    top: 1rem;
+  }
+
+  .docs__nav-item {
+    border-radius: 0.75rem;
+    text-align: left;
   }
 }
