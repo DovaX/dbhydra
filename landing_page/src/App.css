@@ -1,0 +1,373 @@
+.page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.bg-glow {
+  position: fixed;
+  width: 42rem;
+  height: 42rem;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-glow--left {
+  top: -10rem;
+  left: -12rem;
+  background: rgba(35, 120, 160, 0.22);
+}
+
+.bg-glow--right {
+  right: -8rem;
+  bottom: 10rem;
+  background: rgba(61, 214, 198, 0.12);
+}
+
+.header,
+main,
+.footer {
+  position: relative;
+  z-index: 1;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+.logo__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.45rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.nav {
+  display: none;
+  gap: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.nav a:hover,
+.footer__links a:hover {
+  color: var(--accent);
+}
+
+.header__cta {
+  padding: 0.55rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.hero {
+  display: grid;
+  gap: 2.5rem;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.hero__content {
+  max-width: 38rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1,
+.section h2,
+.install__card h2 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.section h2,
+.install__card h2 {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+
+.hero__lead,
+.section__lead {
+  margin: 1.25rem 0 0;
+  color: var(--text-muted);
+  font-size: 1.08rem;
+  max-width: 34rem;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 1.75rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.8rem;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, #3dd6c6, #2bb3a5);
+  color: #042018;
+  box-shadow: 0 12px 30px var(--accent-glow);
+}
+
+.btn--ghost {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hero__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.hero__stats strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.hero__stats span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.hero__panel,
+.terminal,
+.code-block,
+.feature-card,
+.install__card {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(17, 31, 46, 0.95), rgba(8, 19, 29, 0.95));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.terminal,
+.code-block {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.terminal__bar span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.terminal__bar p {
+  margin: 0 0 0 0.5rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+}
+
+pre {
+  margin: 0;
+  padding: 1.15rem 1.25rem;
+  overflow-x: auto;
+}
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: #c8e6ef;
+  white-space: pre;
+}
+
+.section {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 4rem;
+}
+
+.section__header {
+  max-width: 42rem;
+  margin-bottom: 2rem;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.feature-card {
+  padding: 1.35rem;
+  border-radius: 1rem;
+}
+
+.feature-card h3 {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+}
+
+.feature-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.96rem;
+}
+
+.section--split {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+.database-list {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.database-list li {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  font-weight: 500;
+}
+
+.database-list li::before {
+  content: '◆';
+  margin-right: 0.65rem;
+  color: var(--accent);
+  font-size: 0.7rem;
+}
+
+.install__card {
+  padding: 2rem;
+  border-radius: 1.25rem;
+}
+
+.install__steps {
+  display: grid;
+  gap: 1rem;
+  margin: 1.75rem 0 2rem;
+}
+
+.install__step {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.install__step span {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.install__step p {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.install__step code {
+  color: var(--text-muted);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer__links {
+  display: flex;
+  gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .nav {
+    display: flex;
+  }
+
+  .hero {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: center;
+    padding-top: 3rem;
+  }
+
+  .section--split {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .install__steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
