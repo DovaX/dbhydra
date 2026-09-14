@@ -52,15 +52,8 @@ main,
   letter-spacing: -0.02em;
 }
 
-.logo__mark {
-  display: inline-grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.45rem;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.85rem;
+.logo__icon {
+  flex-shrink: 0;
 }
 
 .nav {
@@ -93,6 +86,97 @@ main,
 
 .hero__content {
   max-width: 38rem;
+}
+
+.hero__visual {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.hero__logo-wrap {
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(61, 214, 198, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(17, 31, 46, 0.95), rgba(8, 19, 29, 0.95));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.hero__logo {
+  width: min(100%, 16rem);
+  height: auto;
+  filter: drop-shadow(0 12px 28px rgba(61, 214, 198, 0.22));
+}
+
+.install-command {
+  margin-top: 1.5rem;
+  border: 1px solid rgba(61, 214, 198, 0.35);
+  border-radius: 1rem;
+  background: rgba(61, 214, 198, 0.06);
+  overflow: hidden;
+}
+
+.install-command__label {
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(61, 214, 198, 0.18);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.install-command__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1rem 1rem 1.1rem;
+}
+
+.install-command__prompt {
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+}
+
+.install-command__row code {
+  flex: 1;
+  font-size: clamp(0.95rem, 2.5vw, 1.15rem);
+  font-weight: 500;
+  color: #ecfeff;
+  white-space: nowrap;
+}
+
+.install-command__copy {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.install-command__copy:hover {
+  border-color: rgba(61, 214, 198, 0.45);
+  color: var(--accent);
+}
+
+.install-command--hero {
+  margin-top: 1.75rem;
+  box-shadow: 0 0 0 1px rgba(61, 214, 198, 0.08), 0 18px 40px rgba(61, 214, 198, 0.12);
+}
+
+.install-command--featured {
+  margin: 1.5rem 0 0;
+  background: rgba(61, 214, 198, 0.1);
+}
+
+.install-command--featured .install-command__row code {
+  font-size: clamp(1.05rem, 3vw, 1.35rem);
 }
 
 .eyebrow {

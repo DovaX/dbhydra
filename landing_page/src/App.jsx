@@ -1,4 +1,6 @@
 import './App.css'
+import HydraLogo from './components/HydraLogo.jsx'
+import InstallCommand from './components/InstallCommand.jsx'
 
 const FEATURES = [
   {
@@ -68,7 +70,7 @@ function App() {
 
       <header className="header">
         <a className="logo" href="#top">
-          <span className="logo__mark">◇</span>
+          <HydraLogo className="logo__icon" size={36} />
           dbhydra
         </a>
         <nav className="nav">
@@ -99,9 +101,17 @@ function App() {
               stores, and spreadsheet workflows — so you spend less time on
               plumbing and more time on analysis.
             </p>
+
+            <InstallCommand variant="hero" />
+
             <div className="hero__actions">
-              <a className="btn btn--primary" href="#install">
-                Get started
+              <a
+                className="btn btn--primary"
+                href="https://pypi.org/project/dbhydra/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Install from PyPI
               </a>
               <a
                 className="btn btn--ghost"
@@ -114,8 +124,8 @@ function App() {
             </div>
             <div className="hero__stats">
               <div>
-                <strong>pip install</strong>
-                <span>One-line setup</span>
+                <strong>One command</strong>
+                <span>pip install dbhydra</span>
               </div>
               <div>
                 <strong>6+ backends</strong>
@@ -128,17 +138,26 @@ function App() {
             </div>
           </div>
 
-          <div className="hero__panel">
-            <div className="terminal">
-              <div className="terminal__bar">
-                <span />
-                <span />
-                <span />
-                <p>quickstart.py</p>
+          <div className="hero__visual">
+            <div className="hero__logo-wrap">
+              <img
+                className="hero__logo"
+                src="/dbhydra-logo.png"
+                alt="dbhydra logo — hydra heads connecting to a database"
+              />
+            </div>
+            <div className="hero__panel">
+              <div className="terminal">
+                <div className="terminal__bar">
+                  <span />
+                  <span />
+                  <span />
+                  <p>quickstart.py</p>
+                </div>
+                <pre>
+                  <code>{CODE_EXAMPLE}</code>
+                </pre>
               </div>
-              <pre>
-                <code>{CODE_EXAMPLE}</code>
-              </pre>
             </div>
           </div>
         </section>
@@ -191,6 +210,7 @@ function App() {
           <div className="install__card">
             <p className="eyebrow">Installation</p>
             <h2>Start in under a minute</h2>
+            <InstallCommand variant="featured" />
             <div className="install__steps">
               <div className="install__step">
                 <span>1</span>
