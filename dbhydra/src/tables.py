@@ -122,9 +122,9 @@ class PostgresTable(AbstractTable):
         return (mysql_types)
 
 
-    def select_all(self):
-        print(super().select_all())
-        return [i for i in super().select_all()]
+    def select_all(self, *args, **kwargs):
+        print(super().select_all(*args, **kwargs))
+        return [i for i in super().select_all(*args, **kwargs)]
 
     @classmethod
     def init_all_columns(cls, db1, name, id_column_name="id"):
@@ -845,11 +845,10 @@ class MysqlTable(AbstractTable):
                         if debug_mode:
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
-            
-            elif len(total_output)==1:
-                return(total_output[0])
-            else:
-                return(total_output)
+
+        if len(total_output)==1:
+            return(total_output[0])
+        return(total_output)
                 
 
     def add_foreign_key(self, foreign_key):

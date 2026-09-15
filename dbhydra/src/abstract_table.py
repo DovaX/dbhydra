@@ -134,13 +134,29 @@ class AbstractSelectable:
             return(rows)
             
 
-    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None):
+    def _resolve_select_columns(self, columns: Optional[list[str]] = None) -> list[str]:
+        if columns is None:
+            if not self.columns:
+                raise ValueError(f"Table {self.name} has no columns")
+            return list(self.columns)
+        if not columns:
+            raise ValueError("columns must be a non-empty list")
+        if self.columns is not None:
+            known = set(self.columns)
+            unknown = [c for c in columns if c not in known]
+            if unknown:
+                raise ValueError(
+                    f"Unknown columns {unknown} for table {self.name}; known: {self.columns}"
+                )
+        return list(columns)
+
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
         quote = self.db1.identifier_quote
-        all_cols_query = ""
-        for col in self.columns:
-            all_cols_query = all_cols_query + quote + col + quote + ","
-        if all_cols_query[-1] == ",":
-            all_cols_query = all_cols_query[:-1]
+        selected_columns = self._resolve_select_columns(columns)
+        all_cols_query = ", ".join(
+            quote + col + quote
+            for col in selected_columns
+        )
         
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
         
@@ -173,13 +189,13 @@ class AbstractSelectable:
         list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None):
-        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns)
         if self.query_building_enabled:
             self.to_df()
             df=None
         else:
-            table_columns = self.columns
+            table_columns = self._resolve_select_columns(columns)
             df = pd.DataFrame(rows, columns=table_columns)
         return (df)
 
