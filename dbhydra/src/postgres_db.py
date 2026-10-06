@@ -10,6 +10,7 @@ if platform != "linux" and platform != "linux2":
 
 class PostgresDb(AbstractDb):
     matching_table_class = PostgresTable
+    supports_bound_parameters = True
 
     def connect_locally(self):
         self.connection = psycopg2.connect(
@@ -32,8 +33,11 @@ class PostgresDb(AbstractDb):
         self.cursor.close()
         print("DB connection closed")
 
-    def execute(self, query, is_autocommitting=True):
-        result=self.cursor.execute(query)
+    def execute(self, query, is_autocommitting=True, *, params=None):
+        if params is None:
+            result=self.cursor.execute(query)
+        else:
+            result=self.cursor.execute(query, params)
         if is_autocommitting:
             self.connection.commit()
         return result

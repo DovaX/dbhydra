@@ -1,4 +1,5 @@
 import binascii
+import warnings
 import pandas as pd
 from typing import Optional, Any
 import numpy as np
@@ -150,6 +151,18 @@ class AbstractSelectable:
                 )
         return list(columns)
 
+    def _split_predicate(self, expression: str) -> tuple[str, str, str]:
+        found_where_operator = None
+        for where_operator in [">=", "<=", "LIKE", "IN", ">", "<", "="]:
+            if where_operator in expression:
+                found_where_operator = where_operator
+                break
+        if found_where_operator is None:
+            raise ValueError(f"expected 'column=value', got {expression!r}")
+        where_column = expression.split(found_where_operator)[0].strip().strip('`"[]')
+        where_value = expression.split(found_where_operator)[1].strip()
+        return where_column, found_where_operator, where_value
+
     def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
         quote = self.db1.identifier_quote
         selected_columns = self._resolve_select_columns(columns)
@@ -165,14 +178,7 @@ class AbstractSelectable:
             if is_compound:
                 query += f" WHERE {where}"
             else:
-                found_where_operator = None
-                for where_operator in [">=", "<=", ">", "<", "=", "LIKE", "IN"]:
-                    if where_operator in where:
-                        found_where_operator = where_operator
-                        break
-                assert found_where_operator is not None
-                where_column = where.split(found_where_operator)[0].strip().strip('`"[]') #  strip any existing backticks/quotes from the column name before re-quoting
-                where_value = where.split(found_where_operator)[1].strip()
+                where_column, found_where_operator, where_value = self._split_predicate(where)
                 query += f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
         
         # Add LIMIT and OFFSET to the query
@@ -281,6 +287,23 @@ class AbstractJoinable(AbstractSelectable):
 
 
 
+def _bound_value(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        if isinstance(value, np.floating) and np.isnan(value):
+            return None
+        value = value.item()
+    if value is None:
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 class AbstractTable(AbstractJoinable, abc.ABC):
     def __init__(self, db1, name, columns = None, types: Optional[list[str]] = None, id_column_name: str = "id"):
         """id_column_name -> name of predefined column with autoincrement + PK"""
@@ -312,7 +335,17 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             print(query)
         self.execute(query)
 
+    # Remove this method. Callers pass SQL fragments ("title='x'", "id=1") and
+    # this pastes them into the statement after splitting on the first operator.
+    # A quote, semicolon, or comment inside a value rewrites the statement, and
+    # an omitted WHERE updates every row. Use update_where, which binds values
+    # as parameters and requires a WHERE.
     def update(self, variable_assign, where=None, debug_mode = False):
+        warnings.warn(
+            "AbstractTable.update pastes SQL literals; use update_where",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         quote = self.db1.identifier_quote
 
         assert "=" in variable_assign 
@@ -323,15 +356,47 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if where:
             query += f" WHERE {where}"
 
-        #Old broken implementation it gives `` for the SQL syntax query
-        # if where is None:
-        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote}"
-        # else:
-        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote} WHERE {quote}{where}{quote}"
+    def update_where(self, values: dict[str, Any], where: dict[str, Any], debug_mode: bool = False):
+        """UPDATE columns in ``values`` for rows matching every equality in ``where``.
 
+        Values are bound parameters. Column names are identifiers taken from the
+        table definition. An empty ``where`` is rejected so this cannot update
+        every row.
+        """
+        if not getattr(self.db1, "supports_bound_parameters", False):
+            raise NotImplementedError(
+                f"{type(self.db1).__name__} cannot bind parameters; "
+                "update_where will not concatenate values into SQL"
+            )
+        if not values:
+            raise ValueError("values must set at least one column")
+        if not where:
+            raise ValueError("where must match at least one column; refusing an unbounded UPDATE")
+        self._require_update_columns([*values, *where])
+        quote = self.db1.identifier_quote
+        if quote and quote in self.name:
+            raise ValueError(f"table name contains the identifier quote: {self.name!r}")
+        placeholder = self.db1.param_placeholder
+        set_clause = ", ".join(f"{quote}{column}{quote} = {placeholder}" for column in values)
+        where_clause = " AND ".join(f"{quote}{column}{quote} = {placeholder}" for column in where)
+        query = f"UPDATE {quote}{self.name}{quote} SET {set_clause} WHERE {where_clause}"
+        params = [_bound_value(value) for value in values.values()]
+        params.extend(_bound_value(value) for value in where.values())
         if debug_mode:
-            print(query)
-        return self.execute(query)
+            print(query, params)
+        return self.db1.execute(query, params=params)
+
+    def _require_update_columns(self, columns: list[str]) -> None:
+        if self.columns is not None:
+            unknown = [column for column in columns if column not in self.columns]
+            if unknown:
+                raise ValueError(
+                    f"Unknown columns {unknown} for table {self.name}; known: {self.columns}"
+                )
+            return
+        invalid = [column for column in columns if not column.isidentifier()]
+        if invalid:
+            raise ValueError(f"Refusing unsafe column identifiers: {invalid}")
 
     def update_from_df(
             self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None, debug_mode = False) -> None:

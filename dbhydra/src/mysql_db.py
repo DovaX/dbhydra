@@ -9,6 +9,7 @@ from dbhydra.src.tables import MysqlTable
 
 class MysqlDb(AbstractDb):
     matching_table_class = MysqlTable
+    supports_bound_parameters = True
     python_database_type_mapping = PYTHON_TO_MYSQL_DATA_MAPPING = \
     {
     'int': "int",
@@ -52,8 +53,11 @@ class MysqlDb(AbstractDb):
         self.execute(create_db_command)
 
         
-    def execute(self, query, is_autocommitting=True):
-        result=self.cursor.execute(query)
+    def execute(self, query, is_autocommitting=True, *, params=None):
+        if params is None:
+            result=self.cursor.execute(query)
+        else:
+            result=self.cursor.execute(query, params)
         if is_autocommitting:
             self.connection.commit()
             if self.debug_mode:
