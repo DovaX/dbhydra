@@ -1,7 +1,8 @@
 import binascii
+import re
 import warnings
 import pandas as pd
-from typing import Optional, Any
+from typing import Optional, Any, Union
 import numpy as np
 import abc
 
@@ -151,6 +152,48 @@ class AbstractSelectable:
                 )
         return list(columns)
 
+    def _resolve_order_by(self, order_by: Optional[Union[str, list, tuple]] = None) -> Optional[str]:
+        if order_by is None:
+            return None
+        if isinstance(order_by, str):
+            specs = [order_by]
+        elif isinstance(order_by, (list, tuple)):
+            if not order_by:
+                raise ValueError("order_by must be a non-empty list")
+            specs = list(order_by)
+        else:
+            raise ValueError("order_by must be a column name or a list of column names")
+
+        quote = self.db1.identifier_quote
+        known = set(self.columns) if self.columns is not None else None
+        clauses = []
+        for spec in specs:
+            if not isinstance(spec, str) or not spec.strip():
+                raise ValueError(f"invalid order_by entry {spec!r}")
+            tokens = spec.split()
+            if len(tokens) == 1:
+                column, direction = tokens[0], "ASC"
+            elif len(tokens) == 2:
+                column, direction = tokens
+            else:
+                raise ValueError(f"invalid order_by entry {spec!r}")
+            column = column.strip().strip('`"[]')
+            direction = direction.upper()
+            if direction not in ("ASC", "DESC"):
+                raise ValueError(f"order direction must be ASC or DESC, got {direction!r}")
+            if "from" in column.lower():
+                raise ValueError(
+                    f"order_by column {column!r} contains 'from', which breaks result parsing"
+                )
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column) is None:
+                raise ValueError(f"invalid order_by column {column!r}")
+            if known is not None and column not in known:
+                raise ValueError(
+                    f"Unknown order_by column {column!r} for table {self.name}; known: {self.columns}"
+                )
+            clauses.append(f"{quote}{column}{quote} {direction}")
+        return ", ".join(clauses)
+
     def _split_predicate(self, expression: str) -> tuple[str, str, str]:
         found_where_operator = None
         for where_operator in [">=", "<=", "LIKE", "IN", ">", "<", "="]:
@@ -163,7 +206,7 @@ class AbstractSelectable:
         where_value = expression.split(found_where_operator)[1].strip()
         return where_column, found_where_operator, where_value
 
-    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None):
         quote = self.db1.identifier_quote
         selected_columns = self._resolve_select_columns(columns)
         all_cols_query = ", ".join(
@@ -180,6 +223,10 @@ class AbstractSelectable:
             else:
                 where_column, found_where_operator, where_value = self._split_predicate(where)
                 query += f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
+
+        order_sql = self._resolve_order_by(order_by)
+        if order_sql:
+            query += f" ORDER BY {order_sql}"
         
         # Add LIMIT and OFFSET to the query
         if limit is not None and limit > 0:
@@ -195,8 +242,8 @@ class AbstractSelectable:
         list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
-        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns, order_by = order_by)
         if self.query_building_enabled:
             self.to_df()
             df=None

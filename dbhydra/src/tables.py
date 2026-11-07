@@ -807,7 +807,10 @@ class MysqlTable(AbstractTable):
                 elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
                 elif "json" in self.types[j + start_index]:
-                    query += f"'{rows[k][j]}', "
+                    # No space after the comma. The trailing-separator trim below
+                    # only removes a comma when it is the last character, so a
+                    # trailing space made a final JSON column emit `... ', )`.
+                    query += "'" + str(rows[k][j]) + "',"
                 elif "text" in self.types[j + start_index]:
                     # Covers text, mediumtext, longtext
                     if replace_apostrophes:
