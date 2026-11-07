@@ -206,6 +206,16 @@ class AbstractSelectable:
         where_value = expression.split(found_where_operator)[1].strip()
         return where_column, found_where_operator, where_value
 
+    def _where_sql(self, where: Optional[str]) -> str:
+        if not where:
+            return ""
+        quote = self.db1.identifier_quote
+        is_compound = " AND " in where.upper() or " OR " in where.upper()
+        if is_compound:
+            return f" WHERE {where}"
+        where_column, found_where_operator, where_value = self._split_predicate(where)
+        return f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
+
     def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None):
         quote = self.db1.identifier_quote
         selected_columns = self._resolve_select_columns(columns)
@@ -215,14 +225,7 @@ class AbstractSelectable:
         )
         
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
-        
-        if where:
-            is_compound = " AND " in where.upper() or " OR " in where.upper()
-            if is_compound:
-                query += f" WHERE {where}"
-            else:
-                where_column, found_where_operator, where_value = self._split_predicate(where)
-                query += f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
+        query += self._where_sql(where)
 
         order_sql = self._resolve_order_by(order_by)
         if order_sql:
@@ -251,6 +254,13 @@ class AbstractSelectable:
             table_columns = self._resolve_select_columns(columns)
             df = pd.DataFrame(rows, columns=table_columns)
         return (df)
+
+    def count(self, where: Optional[str] = None, debug_mode: bool = False) -> int:
+        """Row count. Uses COUNT(1) because a '*' in the SQL is parsed as 'every column'."""
+        quote = self.db1.identifier_quote
+        query = f"SELECT COUNT(1) AS n FROM {quote}{self.name}{quote}{self._where_sql(where)};"
+        rows = self.select(query, debug_mode=debug_mode)
+        return int(rows[0][0])
 
     def export_to_xlsx(self, filename="items.xlsx"):
         list1 = self.select_all()
