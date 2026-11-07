@@ -152,6 +152,20 @@ class AbstractSelectable:
                 )
         return list(columns)
 
+    def _checked_identifier(self, column: str, purpose: str) -> str:
+        column = column.strip().strip('`"[]')
+        if "from" in column.lower():
+            raise ValueError(
+                f"{purpose} column {column!r} contains 'from', which breaks result parsing"
+            )
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column) is None:
+            raise ValueError(f"invalid {purpose} column {column!r}")
+        if self.columns is not None and column not in self.columns:
+            raise ValueError(
+                f"Unknown {purpose} column {column!r} for table {self.name}; known: {self.columns}"
+            )
+        return column
+
     def _resolve_order_by(self, order_by: Optional[Union[str, list, tuple]] = None) -> Optional[str]:
         if order_by is None:
             return None
@@ -165,7 +179,6 @@ class AbstractSelectable:
             raise ValueError("order_by must be a column name or a list of column names")
 
         quote = self.db1.identifier_quote
-        known = set(self.columns) if self.columns is not None else None
         clauses = []
         for spec in specs:
             if not isinstance(spec, str) or not spec.strip():
@@ -177,22 +190,36 @@ class AbstractSelectable:
                 column, direction = tokens
             else:
                 raise ValueError(f"invalid order_by entry {spec!r}")
-            column = column.strip().strip('`"[]')
+            column = self._checked_identifier(column, "order_by")
             direction = direction.upper()
             if direction not in ("ASC", "DESC"):
                 raise ValueError(f"order direction must be ASC or DESC, got {direction!r}")
-            if "from" in column.lower():
-                raise ValueError(
-                    f"order_by column {column!r} contains 'from', which breaks result parsing"
-                )
-            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column) is None:
-                raise ValueError(f"invalid order_by column {column!r}")
-            if known is not None and column not in known:
-                raise ValueError(
-                    f"Unknown order_by column {column!r} for table {self.name}; known: {self.columns}"
-                )
             clauses.append(f"{quote}{column}{quote} {direction}")
         return ", ".join(clauses)
+
+    def _resolve_group_by(self, group_by: Optional[Union[str, list, tuple]] = None) -> Optional[list[str]]:
+        if group_by is None:
+            return None
+        if isinstance(group_by, str):
+            specs = [group_by]
+        elif isinstance(group_by, (list, tuple)):
+            if not group_by:
+                raise ValueError("group_by must be a non-empty list")
+            specs = list(group_by)
+        else:
+            raise ValueError("group_by must be a column name or a list of column names")
+
+        columns = []
+        seen = set()
+        for spec in specs:
+            if not isinstance(spec, str) or not spec.strip() or len(spec.split()) != 1:
+                raise ValueError(f"invalid group_by entry {spec!r}")
+            column = self._checked_identifier(spec, "group_by")
+            if column in seen:
+                raise ValueError(f"duplicate group_by column {column!r}")
+            seen.add(column)
+            columns.append(column)
+        return columns
 
     def _split_predicate(self, expression: str) -> tuple[str, str, str]:
         found_where_operator = None
@@ -216,9 +243,16 @@ class AbstractSelectable:
         where_column, found_where_operator, where_value = self._split_predicate(where)
         return f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
 
-    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None):
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None, group_by: Optional[Union[str, list, tuple]] = None):
         quote = self.db1.identifier_quote
         selected_columns = self._resolve_select_columns(columns)
+        grouped = self._resolve_group_by(group_by)
+        if grouped is not None:
+            outside = [column for column in selected_columns if column not in grouped]
+            if outside:
+                raise ValueError(
+                    f"columns {outside} are selected but missing from group_by {grouped}"
+                )
         all_cols_query = ", ".join(
             quote + col + quote
             for col in selected_columns
@@ -226,6 +260,8 @@ class AbstractSelectable:
         
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
         query += self._where_sql(where)
+        if grouped:
+            query += " GROUP BY " + ", ".join(f"{quote}{column}{quote}" for column in grouped)
 
         order_sql = self._resolve_order_by(order_by)
         if order_sql:
@@ -245,8 +281,8 @@ class AbstractSelectable:
         list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None):
-        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns, order_by = order_by)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None, group_by: Optional[Union[str, list, tuple]] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns, order_by = order_by, group_by = group_by)
         if self.query_building_enabled:
             self.to_df()
             df=None
