@@ -807,7 +807,10 @@ class MysqlTable(AbstractTable):
                 elif "date" in self.types[j + start_index]:
                     query += "'" + str(rows[k][j]) + "',"
                 elif "json" in self.types[j + start_index]:
-                    query += f"'{rows[k][j]}', "
+                    # No space after the comma. The trailing-separator trim below
+                    # only removes a comma when it is the last character, so a
+                    # trailing space made a final JSON column emit `... ', )`.
+                    query += "'" + str(rows[k][j]) + "',"
                 elif "text" in self.types[j + start_index]:
                     # Covers text, mediumtext, longtext
                     if replace_apostrophes:
@@ -846,10 +849,9 @@ class MysqlTable(AbstractTable):
                             with open("log.txt", "a") as file:
                                 file.write("Query " + str(query) + " could not be inserted:" + str(e) + "\n")
 
-            elif len(total_output)==1:
-                return(total_output[0])
-            else:
-                return(total_output)
+        if len(total_output)==1:
+            return(total_output[0])
+        return(total_output)
                 
 
     def add_foreign_key(self, foreign_key):

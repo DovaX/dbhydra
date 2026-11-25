@@ -1,6 +1,8 @@
 import binascii
+import re
+import warnings
 import pandas as pd
-from typing import Optional, Any
+from typing import Optional, Any, Union
 import numpy as np
 import abc
 
@@ -150,30 +152,120 @@ class AbstractSelectable:
                 )
         return list(columns)
 
-    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
+    def _checked_identifier(self, column: str, purpose: str) -> str:
+        column = column.strip().strip('`"[]')
+        if "from" in column.lower():
+            raise ValueError(
+                f"{purpose} column {column!r} contains 'from', which breaks result parsing"
+            )
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column) is None:
+            raise ValueError(f"invalid {purpose} column {column!r}")
+        if self.columns is not None and column not in self.columns:
+            raise ValueError(
+                f"Unknown {purpose} column {column!r} for table {self.name}; known: {self.columns}"
+            )
+        return column
+
+    def _resolve_order_by(self, order_by: Optional[Union[str, list, tuple]] = None) -> Optional[str]:
+        if order_by is None:
+            return None
+        if isinstance(order_by, str):
+            specs = [order_by]
+        elif isinstance(order_by, (list, tuple)):
+            if not order_by:
+                raise ValueError("order_by must be a non-empty list")
+            specs = list(order_by)
+        else:
+            raise ValueError("order_by must be a column name or a list of column names")
+
+        quote = self.db1.identifier_quote
+        clauses = []
+        for spec in specs:
+            if not isinstance(spec, str) or not spec.strip():
+                raise ValueError(f"invalid order_by entry {spec!r}")
+            tokens = spec.split()
+            if len(tokens) == 1:
+                column, direction = tokens[0], "ASC"
+            elif len(tokens) == 2:
+                column, direction = tokens
+            else:
+                raise ValueError(f"invalid order_by entry {spec!r}")
+            column = self._checked_identifier(column, "order_by")
+            direction = direction.upper()
+            if direction not in ("ASC", "DESC"):
+                raise ValueError(f"order direction must be ASC or DESC, got {direction!r}")
+            clauses.append(f"{quote}{column}{quote} {direction}")
+        return ", ".join(clauses)
+
+    def _resolve_group_by(self, group_by: Optional[Union[str, list, tuple]] = None) -> Optional[list[str]]:
+        if group_by is None:
+            return None
+        if isinstance(group_by, str):
+            specs = [group_by]
+        elif isinstance(group_by, (list, tuple)):
+            if not group_by:
+                raise ValueError("group_by must be a non-empty list")
+            specs = list(group_by)
+        else:
+            raise ValueError("group_by must be a column name or a list of column names")
+
+        columns = []
+        seen = set()
+        for spec in specs:
+            if not isinstance(spec, str) or not spec.strip() or len(spec.split()) != 1:
+                raise ValueError(f"invalid group_by entry {spec!r}")
+            column = self._checked_identifier(spec, "group_by")
+            if column in seen:
+                raise ValueError(f"duplicate group_by column {column!r}")
+            seen.add(column)
+            columns.append(column)
+        return columns
+
+    def _split_predicate(self, expression: str) -> tuple[str, str, str]:
+        found_where_operator = None
+        for where_operator in [">=", "<=", "LIKE", "IN", ">", "<", "="]:
+            if where_operator in expression:
+                found_where_operator = where_operator
+                break
+        if found_where_operator is None:
+            raise ValueError(f"expected 'column=value', got {expression!r}")
+        where_column = expression.split(found_where_operator)[0].strip().strip('`"[]')
+        where_value = expression.split(found_where_operator)[1].strip()
+        return where_column, found_where_operator, where_value
+
+    def _where_sql(self, where: Optional[str]) -> str:
+        if not where:
+            return ""
+        quote = self.db1.identifier_quote
+        is_compound = " AND " in where.upper() or " OR " in where.upper()
+        if is_compound:
+            return f" WHERE {where}"
+        where_column, found_where_operator, where_value = self._split_predicate(where)
+        return f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
+
+    def select_all(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None, group_by: Optional[Union[str, list, tuple]] = None):
         quote = self.db1.identifier_quote
         selected_columns = self._resolve_select_columns(columns)
+        grouped = self._resolve_group_by(group_by)
+        if grouped is not None:
+            outside = [column for column in selected_columns if column not in grouped]
+            if outside:
+                raise ValueError(
+                    f"columns {outside} are selected but missing from group_by {grouped}"
+                )
         all_cols_query = ", ".join(
             quote + col + quote
             for col in selected_columns
         )
         
         query = f"SELECT {all_cols_query} FROM {quote}{self.name}{quote}"
-        
-        if where:
-            is_compound = " AND " in where.upper() or " OR " in where.upper()
-            if is_compound:
-                query += f" WHERE {where}"
-            else:
-                found_where_operator = None
-                for where_operator in [">=", "<=", ">", "<", "=", "LIKE", "IN"]:
-                    if where_operator in where:
-                        found_where_operator = where_operator
-                        break
-                assert found_where_operator is not None
-                where_column = where.split(found_where_operator)[0].strip().strip('`"[]') #  strip any existing backticks/quotes from the column name before re-quoting
-                where_value = where.split(found_where_operator)[1].strip()
-                query += f" WHERE {quote}{where_column}{quote} {found_where_operator} {where_value}"
+        query += self._where_sql(where)
+        if grouped:
+            query += " GROUP BY " + ", ".join(f"{quote}{column}{quote}" for column in grouped)
+
+        order_sql = self._resolve_order_by(order_by)
+        if order_sql:
+            query += f" ORDER BY {order_sql}"
         
         # Add LIMIT and OFFSET to the query
         if limit is not None and limit > 0:
@@ -189,8 +281,8 @@ class AbstractSelectable:
         list1 = self.select(query, debug_mode = debug_mode)
         return (list1)
 
-    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None):
-        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns)
+    def select_to_df(self, debug_mode = False, limit: Optional[int] = None, offset: Optional[int] = None, where: Optional[str] = None, columns: Optional[list[str]] = None, order_by: Optional[Union[str, list, tuple]] = None, group_by: Optional[Union[str, list, tuple]] = None):
+        rows = self.select_all(debug_mode = debug_mode, limit = limit, offset = offset, where = where, columns = columns, order_by = order_by, group_by = group_by)
         if self.query_building_enabled:
             self.to_df()
             df=None
@@ -198,6 +290,13 @@ class AbstractSelectable:
             table_columns = self._resolve_select_columns(columns)
             df = pd.DataFrame(rows, columns=table_columns)
         return (df)
+
+    def count(self, where: Optional[str] = None, debug_mode: bool = False) -> int:
+        """Row count. Uses COUNT(1) because a '*' in the SQL is parsed as 'every column'."""
+        quote = self.db1.identifier_quote
+        query = f"SELECT COUNT(1) AS n FROM {quote}{self.name}{quote}{self._where_sql(where)};"
+        rows = self.select(query, debug_mode=debug_mode)
+        return int(rows[0][0])
 
     def export_to_xlsx(self, filename="items.xlsx"):
         list1 = self.select_all()
@@ -281,6 +380,23 @@ class AbstractJoinable(AbstractSelectable):
 
 
 
+def _bound_value(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        if isinstance(value, np.floating) and np.isnan(value):
+            return None
+        value = value.item()
+    if value is None:
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 class AbstractTable(AbstractJoinable, abc.ABC):
     def __init__(self, db1, name, columns = None, types: Optional[list[str]] = None, id_column_name: str = "id"):
         """id_column_name -> name of predefined column with autoincrement + PK"""
@@ -312,7 +428,17 @@ class AbstractTable(AbstractJoinable, abc.ABC):
             print(query)
         self.execute(query)
 
+    # Remove this method. Callers pass SQL fragments ("title='x'", "id=1") and
+    # this pastes them into the statement after splitting on the first operator.
+    # A quote, semicolon, or comment inside a value rewrites the statement, and
+    # an omitted WHERE updates every row. Use update_where, which binds values
+    # as parameters and requires a WHERE.
     def update(self, variable_assign, where=None, debug_mode = False):
+        warnings.warn(
+            "AbstractTable.update pastes SQL literals; use update_where",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         quote = self.db1.identifier_quote
 
         assert "=" in variable_assign 
@@ -323,15 +449,47 @@ class AbstractTable(AbstractJoinable, abc.ABC):
         if where:
             query += f" WHERE {where}"
 
-        #Old broken implementation it gives `` for the SQL syntax query
-        # if where is None:
-        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote}"
-        # else:
-        #     query = f"UPDATE {quote}{self.name}{quote} SET {quote}{variable_assign}{quote} WHERE {quote}{where}{quote}"
+    def update_where(self, values: dict[str, Any], where: dict[str, Any], debug_mode: bool = False):
+        """UPDATE columns in ``values`` for rows matching every equality in ``where``.
 
+        Values are bound parameters. Column names are identifiers taken from the
+        table definition. An empty ``where`` is rejected so this cannot update
+        every row.
+        """
+        if not getattr(self.db1, "supports_bound_parameters", False):
+            raise NotImplementedError(
+                f"{type(self.db1).__name__} cannot bind parameters; "
+                "update_where will not concatenate values into SQL"
+            )
+        if not values:
+            raise ValueError("values must set at least one column")
+        if not where:
+            raise ValueError("where must match at least one column; refusing an unbounded UPDATE")
+        self._require_update_columns([*values, *where])
+        quote = self.db1.identifier_quote
+        if quote and quote in self.name:
+            raise ValueError(f"table name contains the identifier quote: {self.name!r}")
+        placeholder = self.db1.param_placeholder
+        set_clause = ", ".join(f"{quote}{column}{quote} = {placeholder}" for column in values)
+        where_clause = " AND ".join(f"{quote}{column}{quote} = {placeholder}" for column in where)
+        query = f"UPDATE {quote}{self.name}{quote} SET {set_clause} WHERE {where_clause}"
+        params = [_bound_value(value) for value in values.values()]
+        params.extend(_bound_value(value) for value in where.values())
         if debug_mode:
-            print(query)
-        return self.execute(query)
+            print(query, params)
+        return self.db1.execute(query, params=params)
+
+    def _require_update_columns(self, columns: list[str]) -> None:
+        if self.columns is not None:
+            unknown = [column for column in columns if column not in self.columns]
+            if unknown:
+                raise ValueError(
+                    f"Unknown columns {unknown} for table {self.name}; known: {self.columns}"
+                )
+            return
+        invalid = [column for column in columns if not column.isidentifier()]
+        if invalid:
+            raise ValueError(f"Refusing unsafe column identifiers: {invalid}")
 
     def update_from_df(
             self, update_df: pd.DataFrame, where_column: Optional[str] = None, where_value: Any = None, debug_mode = False) -> None:

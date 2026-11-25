@@ -14,6 +14,8 @@ if sys.platform != "darwin":
 
 class SqlServerDb(AbstractDb):
     matching_table_class = SqlServerTable
+    param_placeholder = "?"
+    supports_bound_parameters = True
     
     def connect_remotely(self):
         if sys.platform == "darwin":

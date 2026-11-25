@@ -49,6 +49,8 @@ class Transaction:
 
 class AbstractDb(abc.ABC):
     matching_table_class = AbstractTable
+    param_placeholder = "%s"
+    supports_bound_parameters = False
     
     typing_to_python_mapping = {
         'List': 'list',
@@ -193,8 +195,11 @@ class AbstractDb(abc.ABC):
                 self.is_autocommiting=True
 
 
-    def execute(self, query):
-        result=self.cursor.execute(query)
+    def execute(self, query, *, params=None):
+        if params is None:
+            result=self.cursor.execute(query)
+        else:
+            result=self.cursor.execute(query, params)
         if self.is_autocommitting:
             self.cursor.commit()
             if self.debug_mode:
